@@ -6,12 +6,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rwejlgaard/org/internal/config"
 	"github.com/rwejlgaard/org/internal/model"
 )
 
 // Parser patterns
 var (
-	headingPattern      = regexp.MustCompile(`^(\*+)\s+(?:(TODO|PROG|BLOCK|DONE)\s+)?(?:\[#([A-C])\]\s+)?(.+?)(?:\s+(:[[:alnum:]_@#%:]+:)\s*)?$`)
 	scheduledPattern    = regexp.MustCompile(`SCHEDULED:\s*<([^>]+)>`)
 	deadlinePattern     = regexp.MustCompile(`DEADLINE:\s*<([^>]+)>`)
 	clockPattern        = regexp.MustCompile(`CLOCK:\s*\[([^\]]+)\](?:--\[([^\]]+)\])?`)
@@ -23,8 +23,29 @@ var (
 	codeBlockEnd        = regexp.MustCompile(`^\s*#\+END_SRC`)
 )
 
+// buildHeadingPattern creates a regex pattern that matches configured states
+func buildHeadingPattern(cfg *config.Config) *regexp.Regexp {
+	stateNames := cfg.GetStateNames()
+	var statesPattern string
+	if len(stateNames) > 0 {
+		// Escape state names and join with |
+		escapedStates := make([]string, len(stateNames))
+		for i, state := range stateNames {
+			escapedStates[i] = regexp.QuoteMeta(state)
+		}
+		statesPattern = strings.Join(escapedStates, "|")
+	} else {
+		// Fallback to default states if none configured
+		statesPattern = "TODO|PROG|BLOCK|DONE"
+	}
+
+	pattern := `^(\*+)\s+(?:(` + statesPattern + `)\s+)?(?:\[#([A-C])\]\s+)?(.+?)(?:\s+(:[[:alnum:]_@#%:]+:)\s*)?$`
+	return regexp.MustCompile(pattern)
+}
+
 // ParseOrgFile reads and parses an org-mode file
-func ParseOrgFile(path string) (*model.OrgFile, error) {
+func ParseOrgFile(path string, cfg *config.Config) (*model.OrgFile, error) {
+	headingPattern := buildHeadingPattern(cfg)
 	file, err := os.Open(path)
 	if err != nil {
 		// If file doesn't exist, return empty org file
