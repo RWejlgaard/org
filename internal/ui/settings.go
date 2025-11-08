@@ -56,12 +56,14 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Up):
 			if m.settingsCursor > 0 {
 				m.settingsCursor--
+				m.updateSettingsScrollOffset()
 			}
 
 		case key.Matches(msg, m.keys.Down):
 			maxCursor := m.getSettingsItemCount() - 1
 			if m.settingsCursor < maxCursor {
 				m.settingsCursor++
+				m.updateSettingsScrollOffset()
 			}
 
 		case key.Matches(msg, m.keys.ShiftUp):
@@ -134,6 +136,36 @@ func (m *uiModel) getSettingsItemCount() int {
 		return len(m.config.GetAllKeybindings())
 	default:
 		return 0
+	}
+}
+
+// updateSettingsScrollOffset adjusts the scroll offset to keep the cursor visible
+func (m *uiModel) updateSettingsScrollOffset() {
+	// Calculate available height for content
+	// Reserve space for: title (2 lines), tabs (2 lines), instructions (3 lines),
+	// input field if focused (3 lines), status bar, and some padding
+	reservedLines := 10
+	if m.textinput.Focused() {
+		reservedLines += 3
+	}
+
+	availableHeight := m.height - reservedLines
+	if availableHeight < 3 {
+		availableHeight = 3 // Minimum visible items
+	}
+
+	// Adjust scroll to keep cursor visible
+	if m.settingsCursor < m.settingsScroll {
+		// Cursor is above visible area, scroll up
+		m.settingsScroll = m.settingsCursor
+	} else if m.settingsCursor >= m.settingsScroll+availableHeight {
+		// Cursor is below visible area, scroll down
+		m.settingsScroll = m.settingsCursor - availableHeight + 1
+	}
+
+	// Ensure scroll offset doesn't go negative
+	if m.settingsScroll < 0 {
+		m.settingsScroll = 0
 	}
 }
 
@@ -460,7 +492,25 @@ func (m *uiModel) viewSettings() string {
 func (m *uiModel) viewSettingsTags() string {
 	var content strings.Builder
 
+	// Calculate visible window
+	reservedLines := 10
+	if m.textinput.Focused() {
+		reservedLines += 3
+	}
+	availableHeight := m.height - reservedLines
+	if availableHeight < 3 {
+		availableHeight = 3
+	}
+
+	endIdx := m.settingsScroll + availableHeight
+	totalItems := len(m.config.Tags.Tags) + 1 // +1 for "Add new tag"
+
 	for i, tag := range m.config.Tags.Tags {
+		// Skip items outside visible window
+		if i < m.settingsScroll || i >= endIdx {
+			continue
+		}
+
 		line := ""
 
 		// Cursor
@@ -479,12 +529,24 @@ func (m *uiModel) viewSettingsTags() string {
 	}
 
 	// Add new tag option
-	if m.settingsCursor == len(m.config.Tags.Tags) && !m.textinput.Focused() {
-		content.WriteString("▶ ")
-	} else {
-		content.WriteString("  ")
+	addNewIdx := len(m.config.Tags.Tags)
+	if addNewIdx >= m.settingsScroll && addNewIdx < endIdx {
+		if m.settingsCursor == len(m.config.Tags.Tags) && !m.textinput.Focused() {
+			content.WriteString("▶ ")
+		} else {
+			content.WriteString("  ")
+		}
+		content.WriteString(m.styles.statusStyle.Render("+ Add new tag (press 'c')") + "\n")
 	}
-	content.WriteString(m.styles.statusStyle.Render("+ Add new tag (press 'c')") + "\n")
+
+	// Add scroll indicator if needed
+	if totalItems > availableHeight {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d]",
+			m.settingsScroll+1,
+			min(endIdx, totalItems),
+			totalItems)
+		content.WriteString(m.styles.statusStyle.Render(scrollInfo))
+	}
 
 	return content.String()
 }
@@ -493,30 +555,52 @@ func (m *uiModel) viewSettingsTags() string {
 func (m *uiModel) viewSettingsStates() string {
 	var content strings.Builder
 
-	// First show the default new task state setting
-	line := ""
-	if m.settingsCursor == 0 && !m.textinput.Focused() {
-		line += "▶ "
-	} else {
-		line += "  "
+	// Calculate visible window
+	reservedLines := 10
+	if m.textinput.Focused() {
+		reservedLines += 3
 	}
-	line += "Default new task state: "
-	if m.config.States.DefaultNewTaskState == "" {
-		line += m.styles.statusStyle.Render("(none)")
-	} else {
-		// Try to get the color for this state
-		color := m.config.GetStateColor(m.config.States.DefaultNewTaskState)
-		stateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
-		line += stateStyle.Render(m.config.States.DefaultNewTaskState)
+	availableHeight := m.height - reservedLines
+	if availableHeight < 3 {
+		availableHeight = 3
 	}
-	content.WriteString(line + "\n\n")
+
+	endIdx := m.settingsScroll + availableHeight
+	totalItems := len(m.config.States.States) + 2 // +1 for default state, +1 for "Add new state"
+
+	// First show the default new task state setting (item 0)
+	if 0 >= m.settingsScroll && 0 < endIdx {
+		line := ""
+		if m.settingsCursor == 0 && !m.textinput.Focused() {
+			line += "▶ "
+		} else {
+			line += "  "
+		}
+		line += "Default new task state: "
+		if m.config.States.DefaultNewTaskState == "" {
+			line += m.styles.statusStyle.Render("(none)")
+		} else {
+			// Try to get the color for this state
+			color := m.config.GetStateColor(m.config.States.DefaultNewTaskState)
+			stateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+			line += stateStyle.Render(m.config.States.DefaultNewTaskState)
+		}
+		content.WriteString(line + "\n\n")
+	}
 
 	// Then show all configured states
 	for i, state := range m.config.States.States {
+		itemIdx := i + 1 // Offset by 1 for the default state setting
+
+		// Skip items outside visible window
+		if itemIdx < m.settingsScroll || itemIdx >= endIdx {
+			continue
+		}
+
 		line := ""
 
-		// Cursor (offset by 1 because of the default state setting)
-		if i+1 == m.settingsCursor && !m.textinput.Focused() {
+		// Cursor
+		if itemIdx == m.settingsCursor && !m.textinput.Focused() {
 			line += "▶ "
 		} else {
 			line += "  "
@@ -531,12 +615,24 @@ func (m *uiModel) viewSettingsStates() string {
 	}
 
 	// Add new state option
-	if m.settingsCursor == len(m.config.States.States)+1 && !m.textinput.Focused() {
-		content.WriteString("▶ ")
-	} else {
-		content.WriteString("  ")
+	addNewIdx := len(m.config.States.States) + 1
+	if addNewIdx >= m.settingsScroll && addNewIdx < endIdx {
+		if m.settingsCursor == addNewIdx && !m.textinput.Focused() {
+			content.WriteString("▶ ")
+		} else {
+			content.WriteString("  ")
+		}
+		content.WriteString(m.styles.statusStyle.Render("+ Add new state (press 'c')") + "\n")
 	}
-	content.WriteString(m.styles.statusStyle.Render("+ Add new state (press 'c')") + "\n")
+
+	// Add scroll indicator if needed
+	if totalItems > availableHeight {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d]",
+			m.settingsScroll+1,
+			min(endIdx, totalItems),
+			totalItems)
+		content.WriteString(m.styles.statusStyle.Render(scrollInfo))
+	}
 
 	return content.String()
 }
@@ -544,6 +640,16 @@ func (m *uiModel) viewSettingsStates() string {
 // viewSettingsKeybindings renders the keybindings section
 func (m *uiModel) viewSettingsKeybindings() string {
 	var content strings.Builder
+
+	// Calculate visible window
+	reservedLines := 10
+	if m.textinput.Focused() {
+		reservedLines += 3
+	}
+	availableHeight := m.height - reservedLines
+	if availableHeight < 3 {
+		availableHeight = 3
+	}
 
 	// Get all keybindings
 	keybindings := m.config.GetAllKeybindings()
@@ -567,7 +673,15 @@ func (m *uiModel) viewSettingsKeybindings() string {
 		}
 	}
 
+	endIdx := m.settingsScroll + availableHeight
+	totalItems := len(kbList)
+
 	for i, kb := range kbList {
+		// Skip items outside visible window
+		if i < m.settingsScroll || i >= endIdx {
+			continue
+		}
+
 		line := ""
 
 		// Cursor
@@ -582,6 +696,15 @@ func (m *uiModel) viewSettingsKeybindings() string {
 		line += fmt.Sprintf("%-20s : %s", kb.action, keysStr)
 
 		content.WriteString(line + "\n")
+	}
+
+	// Add scroll indicator if needed
+	if totalItems > availableHeight {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d]",
+			m.settingsScroll+1,
+			min(endIdx, totalItems),
+			totalItems)
+		content.WriteString(m.styles.statusStyle.Render(scrollInfo))
 	}
 
 	return content.String()
