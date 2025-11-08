@@ -96,6 +96,11 @@ Changes are automatically saved when you quit the application.
 ![delete](./.imgs/delete_prompt.png)
 ![priority](./.imgs/priority_prompt.png)
 
+### Settings
+![tags](./.imgs/settings_tags.png)
+![states](./.imgs/settings_states.png)
+![keybinds](./.imgs/settings_keybinds.png)
+
 ## Configuration
 
 The application can be configured using a TOML configuration file located at:
