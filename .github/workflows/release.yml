@@ -53,6 +53,14 @@ jobs:
 
           echo "Current version: $MAJOR.$MINOR.$PATCH"
 
+          # Check for chore commits - skip release
+          if [[ "$COMMIT_MSG" =~ ^chore:.*|^CHORE:.* ]]; then
+            echo "Chore commit detected. Skipping release."
+            echo "bump_type=none" >> $GITHUB_OUTPUT
+            echo "new_version=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # Determine bump type based on commit message prefix
           if [[ "$COMMIT_MSG" =~ ^major:.*|^MAJOR:.*|^breaking:.*|^BREAKING:.* ]]; then
             MAJOR=$((MAJOR + 1))
