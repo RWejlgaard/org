@@ -30,7 +30,7 @@ jobs:
       - name: Get commit message
         id: get_commit_message
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_MSG=$(git log -1 --pretty=%s)
           echo "commit_message=${COMMIT_MSG}" >> $GITHUB_OUTPUT
           echo "Commit message: ${COMMIT_MSG}"
 
