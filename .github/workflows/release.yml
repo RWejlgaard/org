@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux, darwin, windows]
+        goos: [linux, darwin, windows, freebsd, netbsd, openbsd]
         goarch: [amd64, arm64]
     steps:
       - name: Checkout code
