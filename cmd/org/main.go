@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// Parse the org file
-	orgFile, err := parser.ParseOrgFile(filePath)
+	orgFile, err := parser.ParseOrgFile(filePath, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing org file: %v\n", err)
 		os.Exit(1)
