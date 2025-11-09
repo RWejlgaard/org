@@ -146,8 +146,11 @@ func (m uiModel) View() string {
 	for i, item := range items {
 		lineCount := 1 // The item itself
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
+			indent := strings.Repeat("  ", item.Level)
+			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
-			highlightedNotes := renderNotesWithHighlighting(filteredNotes)
+			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
+			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
 			lineCount += len(highlightedNotes)
 		}
 		itemLineCount[i] = lineCount
@@ -205,8 +208,10 @@ func (m uiModel) View() string {
 				// Render remaining notes
 				if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
 					indent := strings.Repeat("  ", item.Level)
+					noteIndent := indent + "  "
 					filteredNotes := filterLogbookDrawer(item.Notes)
-					highlightedNotes := renderNotesWithHighlighting(filteredNotes)
+					wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
+					highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
 					for noteIdx := linesToSkip - 1; noteIdx < len(highlightedNotes) && itemLines < availableHeight; noteIdx++ {
 						content.WriteString(indent)
 						content.WriteString("  " + highlightedNotes[noteIdx])
@@ -227,8 +232,10 @@ func (m uiModel) View() string {
 		// Show notes if not folded
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
 			indent := strings.Repeat("  ", item.Level)
+			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
-			highlightedNotes := renderNotesWithHighlighting(filteredNotes)
+			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
+			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
 			for _, note := range highlightedNotes {
 				if itemLines >= availableHeight {
 					break
@@ -610,6 +617,29 @@ func filterLogbookDrawer(notes []string) []string {
 	return filtered
 }
 
+// wrapNoteLines wraps note lines to fit within the specified width
+func wrapNoteLines(notes []string, width int, indent string) []string {
+	var wrapped []string
+	for _, note := range notes {
+		// Don't wrap code block delimiters or drawer markers
+		trimmed := strings.TrimSpace(note)
+		if strings.HasPrefix(trimmed, "#+BEGIN_SRC") ||
+			strings.HasPrefix(trimmed, "#+END_SRC") ||
+			strings.HasPrefix(trimmed, "```") ||
+			trimmed == ":LOGBOOK:" ||
+			trimmed == ":PROPERTIES:" ||
+			trimmed == ":END:" {
+			wrapped = append(wrapped, note)
+			continue
+		}
+
+		// Wrap the note line
+		wrappedLines := wrapText(note, width, indent)
+		wrapped = append(wrapped, wrappedLines...)
+	}
+	return wrapped
+}
+
 // renderNotesWithHighlighting renders notes with syntax highlighting for code blocks
 func renderNotesWithHighlighting(notes []string) []string {
 	if len(notes) == 0 {
@@ -749,6 +779,95 @@ func highlightCode(code, language string) string {
 	}
 
 	return strings.TrimRight(buf.String(), "\n")
+}
+
+// wrapText wraps text to fit within the specified width, accounting for indent
+func wrapText(text string, width int, indent string) []string {
+	if width <= 0 {
+		return []string{text}
+	}
+
+	// Calculate available width after indent
+	indentWidth := lipgloss.Width(indent)
+	availableWidth := width - indentWidth
+	if availableWidth <= 10 {
+		// If very little space, just return the original text
+		return []string{text}
+	}
+
+	var result []string
+	var currentLine strings.Builder
+	currentWidth := 0
+
+	// Split by whitespace while preserving leading/trailing spaces
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		// Preserve empty lines
+		return []string{text}
+	}
+
+	for i, word := range words {
+		wordWidth := lipgloss.Width(word)
+
+		// If this is the first word on the line
+		if currentWidth == 0 {
+			// Handle words longer than available width
+			if wordWidth > availableWidth {
+				// Split the word across multiple lines
+				for len(word) > 0 {
+					if availableWidth <= 0 {
+						availableWidth = 10 // Fallback
+					}
+					chunkSize := availableWidth
+					if chunkSize > len(word) {
+						chunkSize = len(word)
+					}
+					result = append(result, word[:chunkSize])
+					word = word[chunkSize:]
+				}
+				continue
+			}
+			currentLine.WriteString(word)
+			currentWidth = wordWidth
+		} else {
+			// Check if adding this word (plus a space) would exceed the width
+			spaceAndWordWidth := currentWidth + 1 + wordWidth
+			if spaceAndWordWidth > availableWidth {
+				// Start a new line
+				result = append(result, currentLine.String())
+				currentLine.Reset()
+
+				// Handle words longer than available width
+				if wordWidth > availableWidth {
+					for len(word) > 0 {
+						chunkSize := availableWidth
+						if chunkSize > len(word) {
+							chunkSize = len(word)
+						}
+						result = append(result, word[:chunkSize])
+						word = word[chunkSize:]
+					}
+					currentWidth = 0
+					continue
+				}
+
+				currentLine.WriteString(word)
+				currentWidth = wordWidth
+			} else {
+				// Add word to current line
+				currentLine.WriteString(" ")
+				currentLine.WriteString(word)
+				currentWidth = spaceAndWordWidth
+			}
+		}
+
+		// If this is the last word, add the line
+		if i == len(words)-1 && currentLine.Len() > 0 {
+			result = append(result, currentLine.String())
+		}
+	}
+
+	return result
 }
 
 func (m uiModel) renderItem(item *model.Item, isCursor bool) string {
