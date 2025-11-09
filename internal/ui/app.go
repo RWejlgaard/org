@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -104,8 +105,13 @@ func (m *uiModel) updateScrollOffset(availableHeight int) {
 	for i, item := range items {
 		lineCount := 1 // The item itself
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-			// Count note lines (simplified - just count notes)
-			lineCount += len(item.Notes)
+			// Count note lines with wrapping
+			indent := strings.Repeat("  ", item.Level)
+			noteIndent := indent + "  "
+			filteredNotes := filterLogbookDrawer(item.Notes)
+			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
+			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
+			lineCount += len(highlightedNotes)
 		}
 		itemLineCount[i] = lineCount
 	}
