@@ -105,6 +105,7 @@ Feel free to fork and create a pull request if there's any features missing for 
 | `c` | Capture new TODO |
 | `s` | Add sub-task |
 | `D` | Delete item (with confirmation) |
+| `R` | Rename item |
 | `#` | Add/edit tags |
 | `a` | Toggle agenda view |
 | `i` | Clock in |
@@ -114,8 +115,9 @@ Feel free to fork and create a pull request if there's any features missing for 
 | `e` | Set effort |
 | `r` | Toggle reorder mode |
 | `shift+↑/↓` | Move item up/down |
+| `sift+←/→` | Promote/demote item |
 | `,` | Open settings |
-| `ctrl+s` | Save |
+| `ctrl+s` | Force save |
 | `?` | Toggle help |
 | `q` or `ctrl+c` | Quit |
 
