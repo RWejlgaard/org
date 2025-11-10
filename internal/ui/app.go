@@ -27,6 +27,7 @@ const (
 	modeHelp
 	modeSettings
 	modeTagEdit
+	modeRename
 )
 
 type uiModel struct {

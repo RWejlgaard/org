@@ -40,6 +40,8 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSettingsAddState(msg)
 	case modeTagEdit:
 		return m.updateTagEdit(msg)
+	case modeRename:
+		return m.updateRename(msg)
 	}
 
 	switch msg := msg.(type) {
@@ -122,6 +124,12 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.ShiftDown):
 			m.moveItemDown()
 
+		case key.Matches(msg, m.keys.ShiftLeft):
+			m.promoteItem()
+
+		case key.Matches(msg, m.keys.ShiftRight):
+			m.demoteItem()
+
 		case key.Matches(msg, m.keys.CycleState):
 			items := m.getVisibleItems()
 			if len(items) > 0 && m.cursor < len(items) {
@@ -178,6 +186,17 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = modeTagEdit
 				m.textinput.SetValue(strings.Join(items[m.cursor].Tags, ":"))
 				m.textinput.Placeholder = "tag1:tag2:tag3"
+				m.textinput.Focus()
+				return m, textinput.Blink
+			}
+
+		case key.Matches(msg, m.keys.Rename):
+			items := m.getVisibleItems()
+			if len(items) > 0 && m.cursor < len(items) {
+				m.editingItem = items[m.cursor]
+				m.mode = modeRename
+				m.textinput.SetValue(items[m.cursor].Title)
+				m.textinput.Placeholder = "Item title"
 				m.textinput.Focus()
 				return m, textinput.Blink
 			}
@@ -899,6 +918,151 @@ func (m *uiModel) swapItems(item1, item2 *model.Item) {
 	swapInList(m.orgFile.Items)
 }
 
+func (m *uiModel) promoteItem() {
+	items := m.getVisibleItems()
+	if len(items) == 0 || m.cursor >= len(items) {
+		return
+	}
+
+	currentItem := items[m.cursor]
+
+	// Can't promote a top-level item
+	if currentItem.Level <= 1 {
+		m.setStatus("Cannot promote - already at top level")
+		return
+	}
+
+	// Find the parent of this item
+	parent := m.findParent(currentItem)
+	if parent == nil {
+		m.setStatus("Cannot promote - no parent found")
+		return
+	}
+
+	// Remove item from parent's children
+	for i, child := range parent.Children {
+		if child == currentItem {
+			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+			break
+		}
+	}
+
+	// Find grandparent to insert this item after the parent
+	grandparent := m.findParent(parent)
+	if grandparent != nil {
+		// Insert after parent in grandparent's children
+		for i, child := range grandparent.Children {
+			if child == parent {
+				// Decrease level and update all descendants
+				m.adjustItemLevels(currentItem, -1)
+				grandparent.Children = append(grandparent.Children[:i+1], append([]*model.Item{currentItem}, grandparent.Children[i+1:]...)...)
+				break
+			}
+		}
+	} else {
+		// Parent is at top level, insert after parent in m.orgFile.Items
+		for i, item := range m.orgFile.Items {
+			if item == parent {
+				// Decrease level and update all descendants
+				m.adjustItemLevels(currentItem, -1)
+				m.orgFile.Items = append(m.orgFile.Items[:i+1], append([]*model.Item{currentItem}, m.orgFile.Items[i+1:]...)...)
+				break
+			}
+		}
+	}
+
+	m.setStatus("Item promoted")
+
+	// Update cursor to follow the item
+	items = m.getVisibleItems()
+	for i, item := range items {
+		if item == currentItem {
+			m.cursor = i
+			break
+		}
+	}
+}
+
+func (m *uiModel) demoteItem() {
+	items := m.getVisibleItems()
+	if len(items) == 0 || m.cursor >= len(items) {
+		return
+	}
+
+	currentItem := items[m.cursor]
+
+	// Find the previous sibling to make this item its child
+	prevSibling := m.findPreviousSibling(currentItem)
+	if prevSibling == nil {
+		m.setStatus("Cannot demote - no previous sibling")
+		return
+	}
+
+	// Remove item from its current parent's children
+	parent := m.findParent(currentItem)
+	if parent != nil {
+		for i, child := range parent.Children {
+			if child == currentItem {
+				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+				break
+			}
+		}
+	} else {
+		// Item is at top level
+		for i, item := range m.orgFile.Items {
+			if item == currentItem {
+				m.orgFile.Items = append(m.orgFile.Items[:i], m.orgFile.Items[i+1:]...)
+				break
+			}
+		}
+	}
+
+	// Increase level and update all descendants
+	m.adjustItemLevels(currentItem, 1)
+
+	// Add as child of previous sibling
+	prevSibling.Children = append(prevSibling.Children, currentItem)
+	prevSibling.Folded = false // Unfold to show the demoted item
+
+	m.setStatus("Item demoted")
+
+	// Update cursor to follow the item
+	items = m.getVisibleItems()
+	for i, item := range items {
+		if item == currentItem {
+			m.cursor = i
+			break
+		}
+	}
+}
+
+func (m *uiModel) findParent(target *model.Item) *model.Item {
+	var findInList func([]*model.Item) *model.Item
+	findInList = func(items []*model.Item) *model.Item {
+		for _, item := range items {
+			// Check if target is a direct child
+			for _, child := range item.Children {
+				if child == target {
+					return item
+				}
+			}
+			// Recursively check children
+			if result := findInList(item.Children); result != nil {
+				return result
+			}
+		}
+		return nil
+	}
+	return findInList(m.orgFile.Items)
+}
+
+func (m *uiModel) adjustItemLevels(item *model.Item, delta int) {
+	item.Level += delta
+	for _, child := range item.Children {
+		m.adjustItemLevels(child, delta)
+	}
+}
+
 func (m uiModel) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -969,6 +1133,48 @@ func (m *uiModel) updateTagEdit(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.mode = modeList
 			m.textinput.Blur()
+			return m, nil
+
+		default:
+			var cmd tea.Cmd
+			m.textinput, cmd = m.textinput.Update(msg)
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
+// updateRename handles item rename mode
+func (m *uiModel) updateRename(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, m.keys.Quit):
+			m.mode = modeList
+			m.textinput.Blur()
+			m.editingItem = nil
+			return m, nil
+
+		case msg.Type == tea.KeyEnter:
+			if m.editingItem != nil {
+				newTitle := strings.TrimSpace(m.textinput.Value())
+				if newTitle != "" {
+					m.editingItem.Title = newTitle
+					m.setStatus("Item renamed")
+				} else {
+					m.setStatus("Cannot rename to empty title")
+				}
+			}
+			m.mode = modeList
+			m.textinput.Blur()
+			m.editingItem = nil
+			return m, nil
+
+		case msg.Type == tea.KeyEsc:
+			m.mode = modeList
+			m.textinput.Blur()
+			m.editingItem = nil
+			m.setStatus("Cancelled")
 			return m, nil
 
 		default:

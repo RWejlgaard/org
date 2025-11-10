@@ -92,6 +92,8 @@ func (m uiModel) View() string {
 		return m.viewSettingsAddState()
 	case modeTagEdit:
 		return m.viewTagEdit()
+	case modeRename:
+		return m.viewRename()
 	}
 
 	// Build footer (status + help)
@@ -1001,6 +1003,24 @@ func (m uiModel) viewTagEdit() string {
 
 	content.WriteString(m.styles.statusStyle.Render("Enter tags separated by colons (e.g., work:urgent:important)") + "\n")
 	content.WriteString(m.styles.statusStyle.Render("Leave empty to remove all tags") + "\n\n")
+	content.WriteString(m.styles.statusStyle.Render("Press Enter to save • ESC to cancel") + "\n")
+
+	return content.String()
+}
+
+// viewRename renders the rename item view
+func (m uiModel) viewRename() string {
+	var content strings.Builder
+
+	content.WriteString(m.styles.titleStyle.Render("Rename Item") + "\n\n")
+
+	if m.editingItem != nil {
+		content.WriteString(m.styles.statusStyle.Render(fmt.Sprintf("Current: %s", m.editingItem.Title)) + "\n\n")
+	}
+
+	content.WriteString(m.textinput.View() + "\n\n")
+
+	content.WriteString(m.styles.statusStyle.Render("Enter new title for the item") + "\n\n")
 	content.WriteString(m.styles.statusStyle.Render("Press Enter to save • ESC to cancel") + "\n")
 
 	return content.String()

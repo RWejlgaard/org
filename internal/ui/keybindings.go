@@ -14,6 +14,9 @@ type keyMap struct {
 	Right         key.Binding
 	ShiftUp       key.Binding
 	ShiftDown     key.Binding
+	ShiftLeft     key.Binding
+	ShiftRight    key.Binding
+	Rename        key.Binding
 	CycleState    key.Binding
 	ToggleView    key.Binding
 	Quit          key.Binding
@@ -62,6 +65,18 @@ func newKeyMapFromConfig(cfg *config.Config) keyMap {
 		ShiftDown: key.NewBinding(
 			key.WithKeys(kb.ShiftDown...),
 			key.WithHelp(formatKeyHelp(kb.ShiftDown), "move item down"),
+		),
+		ShiftLeft: key.NewBinding(
+			key.WithKeys(kb.ShiftLeft...),
+			key.WithHelp(formatKeyHelp(kb.ShiftLeft), "promote item"),
+		),
+		ShiftRight: key.NewBinding(
+			key.WithKeys(kb.ShiftRight...),
+			key.WithHelp(formatKeyHelp(kb.ShiftRight), "demote item"),
+		),
+		Rename: key.NewBinding(
+			key.WithKeys(kb.Rename...),
+			key.WithHelp(formatKeyHelp(kb.Rename), "rename item"),
 		),
 		CycleState: key.NewBinding(
 			key.WithKeys(kb.CycleState...),
