@@ -148,7 +148,13 @@ func (m uiModel) View() string {
 	for i, item := range items {
 		lineCount := 1 // The item itself
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-			indent := strings.Repeat("  ", item.Level)
+			// Build subtle visual guides for notes
+			guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+			var notePrefix strings.Builder
+			for j := 1; j <= item.Level; j++ {
+				notePrefix.WriteString(guideStyle.Render("· "))
+			}
+			indent := notePrefix.String()
 			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
 			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
@@ -209,7 +215,13 @@ func (m uiModel) View() string {
 
 				// Render remaining notes
 				if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-					indent := strings.Repeat("  ", item.Level)
+					// Build subtle visual guides for notes
+					guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+					var notePrefix strings.Builder
+					for i := 1; i <= item.Level; i++ {
+						notePrefix.WriteString(guideStyle.Render("· "))
+					}
+					indent := notePrefix.String()
 					noteIndent := indent + "  "
 					filteredNotes := filterLogbookDrawer(item.Notes)
 					wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
@@ -233,7 +245,13 @@ func (m uiModel) View() string {
 
 		// Show notes if not folded
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-			indent := strings.Repeat("  ", item.Level)
+			// Build subtle visual guides for notes
+			guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("235"))
+			var notePrefix strings.Builder
+			for i := 1; i <= item.Level; i++ {
+				notePrefix.WriteString(guideStyle.Render("· "))
+			}
+			indent := notePrefix.String()
 			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
 			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
@@ -875,9 +893,17 @@ func wrapText(text string, width int, indent string) []string {
 func (m uiModel) renderItem(item *model.Item, isCursor bool) string {
 	var b strings.Builder
 
-	// Indentation for level
-	indent := strings.Repeat("  ", item.Level-1)
-	b.WriteString(indent)
+	// Indentation with subtle visual nesting guides
+	guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // Very subtle gray
+	for i := 1; i < item.Level; i++ {
+		if i == item.Level-1 {
+			// Last level before the item - use subtle dot connector
+			b.WriteString(guideStyle.Render("· "))
+		} else {
+			// Parent levels - use subtle dot
+			b.WriteString(guideStyle.Render("· "))
+		}
+	}
 
 	// Fold indicator
 	if len(item.Children) > 0 || len(item.Notes) > 0 {
