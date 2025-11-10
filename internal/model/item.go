@@ -26,6 +26,7 @@ type Item struct {
 	Children     []*Item      // Sub-items
 	Folded       bool         // Whether the item is folded (hides notes and children)
 	ClockEntries []ClockEntry // Clock in/out entries
+	SourceFile   string       // Source file path (used in multi-file mode)
 }
 
 // OrgFile represents a parsed org-mode file

@@ -148,7 +148,18 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.EditNotes):
 			items := m.getVisibleItems()
 			if len(items) > 0 && m.cursor < len(items) {
-				m.editingItem = items[m.cursor]
+				selectedItem := items[m.cursor]
+
+				// Check if we're in multi-file mode
+				isMultiFile := len(m.orgFile.Items) > 0 && m.orgFile.Items[0].SourceFile != ""
+
+				// Prevent editing notes for top-level file items in multi-file mode
+				if isMultiFile && selectedItem.Level == 1 && selectedItem.SourceFile != "" {
+					m.setStatus("Cannot add notes to file-level items")
+					return m, nil
+				}
+
+				m.editingItem = selectedItem
 				m.mode = modeEdit
 				m.textarea.SetValue(strings.Join(m.editingItem.Notes, "\n"))
 				m.textarea.Focus()
@@ -173,6 +184,7 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.Capture):
 			m.mode = modeCapture
+			m.captureCursor = m.cursor // Store current cursor position
 			m.textinput.SetValue("")
 			m.textinput.Placeholder = "What needs doing?"
 			m.textinput.Focus()
@@ -356,13 +368,36 @@ func (m uiModel) updateCapture(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Notes:    []string{},
 					Children: []*model.Item{},
 				}
-				// Insert at beginning
-				m.orgFile.Items = append([]*model.Item{newItem}, m.orgFile.Items...)
-				m.setStatus("TODO captured!")
+
+				// Check if we're in multi-file mode
+				isMultiFile := len(m.orgFile.Items) > 0 && m.orgFile.Items[0].SourceFile != ""
+
+				if isMultiFile {
+					// In multi-file mode, add to the file of the highlighted item (using stored cursor position)
+					items := m.getVisibleItems()
+					targetFileItem := m.findTopLevelFileItem(items, m.captureCursor)
+
+					if targetFileItem != nil {
+						// Set the source file for the new item
+						newItem.SourceFile = targetFileItem.SourceFile
+						newItem.Level = 2 // Children of file items are level 2
+
+						// Insert at the beginning of the file item's children
+						targetFileItem.Children = append([]*model.Item{newItem}, targetFileItem.Children...)
+						targetFileItem.Folded = false // Unfold to show the new item
+						m.setStatus("TODO captured to " + targetFileItem.Title)
+					} else {
+						m.setStatus("Error: Could not find file to add to")
+					}
+				} else {
+					// Single file mode: insert at beginning
+					m.orgFile.Items = append([]*model.Item{newItem}, m.orgFile.Items...)
+					m.setStatus("TODO captured!")
+				}
 			}
 			m.mode = modeList
 			m.textinput.Blur()
-			m.cursor = 0
+			// Don't reset cursor, keep it where it was
 			return m, nil
 		case tea.KeyEsc:
 			m.mode = modeList
@@ -374,6 +409,49 @@ func (m uiModel) updateCapture(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.textinput, cmd = m.textinput.Update(msg)
 	return m, cmd
+}
+
+// findTopLevelFileItem finds the top-level file item that contains the item at the given cursor position
+func (m *uiModel) findTopLevelFileItem(items []*model.Item, cursorPos int) *model.Item {
+	if cursorPos < 0 || cursorPos >= len(items) {
+		// Fallback to first file if cursor out of bounds
+		if len(m.orgFile.Items) > 0 {
+			return m.orgFile.Items[0]
+		}
+		return nil
+	}
+
+	selectedItem := items[cursorPos]
+
+	// Check if we're in multi-file mode
+	isMultiFile := len(m.orgFile.Items) > 0 && m.orgFile.Items[0].SourceFile != ""
+
+	if !isMultiFile {
+		// Not in multi-file mode, return nil
+		return nil
+	}
+
+	// If the selected item itself is a file item (level 1 with SourceFile), return it
+	if selectedItem.SourceFile != "" && selectedItem.Level == 1 {
+		return selectedItem
+	}
+
+	// Otherwise, find which top-level file item this item belongs to
+	// by checking the SourceFile field
+	if selectedItem.SourceFile != "" {
+		for _, fileItem := range m.orgFile.Items {
+			if fileItem.SourceFile == selectedItem.SourceFile {
+				return fileItem
+			}
+		}
+	}
+
+	// Fallback: return the first file item
+	if len(m.orgFile.Items) > 0 {
+		return m.orgFile.Items[0]
+	}
+
+	return nil
 }
 
 func (m uiModel) updateAddSubTask(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -395,11 +473,12 @@ func (m uiModel) updateAddSubTask(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Create new sub-task
 				newItem := &model.Item{
-					Level:    m.editingItem.Level + 1,
-					State:    defaultState,
-					Title:    title,
-					Notes:    []string{},
-					Children: []*model.Item{},
+					Level:      m.editingItem.Level + 1,
+					State:      defaultState,
+					Title:      title,
+					Notes:      []string{},
+					Children:   []*model.Item{},
+					SourceFile: m.editingItem.SourceFile, // Inherit source file from parent
 				}
 				m.editingItem.Children = append(m.editingItem.Children, newItem)
 				m.editingItem.Folded = false // Unfold to show new sub-task

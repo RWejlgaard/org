@@ -51,6 +51,7 @@ type uiModel struct {
 	settingsCursor   int             // Cursor position in settings view
 	settingsScroll   int             // Scroll position in settings view
 	settingsSection  settingsSection // Current settings section/tab
+	captureCursor    int             // Store cursor position when entering capture mode
 }
 
 func InitialModel(orgFile *model.OrgFile, cfg *config.Config) uiModel {

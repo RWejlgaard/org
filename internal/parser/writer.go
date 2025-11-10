@@ -11,6 +11,18 @@ import (
 
 // Save writes the org file back to disk
 func Save(orgFile *model.OrgFile) error {
+	// Check if this is a multi-file org (directory-based)
+	// In multi-file mode, top-level items have SourceFile set and represent files
+	isMultiFile := false
+	if len(orgFile.Items) > 0 && orgFile.Items[0].SourceFile != "" {
+		isMultiFile = true
+	}
+
+	if isMultiFile {
+		return saveMultiFile(orgFile)
+	}
+
+	// Single file mode
 	file, err := os.Create(orgFile.Path)
 	if err != nil {
 		return err
@@ -27,6 +39,66 @@ func Save(orgFile *model.OrgFile) error {
 	}
 
 	return nil
+}
+
+// saveMultiFile saves items back to their individual source files
+func saveMultiFile(orgFile *model.OrgFile) error {
+	// Group items by source file
+	fileItems := make(map[string][]*model.Item)
+
+	for _, fileItem := range orgFile.Items {
+		if fileItem.SourceFile == "" {
+			continue
+		}
+
+		// The children of this file item are the actual items to save
+		fileItems[fileItem.SourceFile] = fileItem.Children
+	}
+
+	// Save each file
+	for filePath, items := range fileItems {
+		if err := saveItemsToFile(filePath, items); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// saveItemsToFile writes a list of items to a specific file
+func saveItemsToFile(filePath string, items []*model.Item) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	defer writer.Flush()
+
+	for _, item := range items {
+		// Decrement level since we're saving to individual files
+		decrementedItem := decrementItemLevelForSave(item)
+		if err := writeItem(writer, decrementedItem); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// decrementItemLevelForSave creates a copy of an item with decremented levels for saving
+func decrementItemLevelForSave(item *model.Item) *model.Item {
+	copied := *item
+	copied.Level--
+
+	copiedChildren := make([]*model.Item, len(item.Children))
+	for i, child := range item.Children {
+		copiedChildren[i] = decrementItemLevelForSave(child)
+	}
+	copied.Children = copiedChildren
+
+	return &copied
 }
 
 // writeItem recursively writes an item and its children

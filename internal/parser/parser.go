@@ -3,7 +3,9 @@ package parser
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/rwejlgaard/org/internal/config"
@@ -215,4 +217,71 @@ func ParseOrgFile(path string, cfg *config.Config) (*model.OrgFile, error) {
 	}
 
 	return orgFile, nil
+}
+
+// ParseMultipleOrgFiles loads all .org files in a directory and wraps them as top-level items
+func ParseMultipleOrgFiles(dirPath string, cfg *config.Config) (*model.OrgFile, error) {
+	// Find all .org files in the directory
+	matches, err := filepath.Glob(filepath.Join(dirPath, "*.org"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort files alphabetically
+	sort.Strings(matches)
+
+	// Create a virtual org file
+	multiOrgFile := &model.OrgFile{
+		Path:  dirPath, // Store directory path
+		Items: []*model.Item{},
+	}
+
+	// Parse each file and wrap it as a top-level item
+	for _, filePath := range matches {
+		orgFile, err := ParseOrgFile(filePath, cfg)
+		if err != nil {
+			// Skip files that can't be parsed
+			continue
+		}
+
+		// Create a wrapper item for this file
+		fileName := filepath.Base(filePath)
+		fileItem := &model.Item{
+			Level:      1,
+			State:      model.StateNone,
+			Priority:   model.PriorityNone,
+			Title:      fileName,
+			Tags:       []string{},
+			Notes:      []string{},
+			Children:   []*model.Item{},
+			SourceFile: filePath,
+		}
+
+		// Increment the level of all items from this file and add as children
+		for _, item := range orgFile.Items {
+			incrementItemLevel(item)
+			setSourceFileRecursive(item, filePath)
+			fileItem.Children = append(fileItem.Children, item)
+		}
+
+		multiOrgFile.Items = append(multiOrgFile.Items, fileItem)
+	}
+
+	return multiOrgFile, nil
+}
+
+// incrementItemLevel recursively increments the level of an item and its children
+func incrementItemLevel(item *model.Item) {
+	item.Level++
+	for _, child := range item.Children {
+		incrementItemLevel(child)
+	}
+}
+
+// setSourceFileRecursive sets the source file for an item and all its descendants
+func setSourceFileRecursive(item *model.Item, filePath string) {
+	item.SourceFile = filePath
+	for _, child := range item.Children {
+		setSourceFileRecursive(child, filePath)
+	}
 }

@@ -18,9 +18,46 @@ go build -o bin/org ./cmd/org
 ## Usage
 
 ```bash
-org [filename]           # Open specific org file
-org -f tasks.org         # Open using -f flag
-org                      # Opens ./todo.org by default
+org                      # Open ./todo.org (default)
+org tasks.org            # Open specific org file
+org /path/to/work.org    # Open specific org file with path
+org -m                   # Multi-file: Load all .org files in current directory
+org -m /path/to/dir      # Multi-file: Load all .org files in specified directory
+```
+
+### Single-File Mode (Default)
+
+By default, `org` opens `./todo.org` or the file you specify:
+
+```bash
+org                      # Opens ./todo.org
+org tasks.org            # Opens tasks.org
+org ~/work/project.org   # Opens specific file
+```
+
+### Multi-File Mode
+
+Use the `-m` or `--multi` flag to load all `.org` files in a directory as top-level items. Each file appears as a top-level item in the interface, with its contents nested underneath. Changes made to items are automatically saved back to their respective files.
+
+```bash
+org -m                   # Load all .org files in current directory
+org -m /path/to/dir      # Load all .org files in specified directory
+```
+
+**Example:** If you have these files in your directory:
+- `work.org` containing work tasks
+- `personal.org` containing personal tasks
+- `ideas.org` containing project ideas
+
+Running `org -m` will display:
+```
+* work.org
+** TODO Complete project proposal
+** PROG Review code changes
+* personal.org
+** TODO Buy groceries
+* ideas.org
+** New app concept
 ```
 
 ## Features
