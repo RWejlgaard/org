@@ -23,6 +23,10 @@ org -f tasks.org         # Open using -f flag
 org                      # Opens ./todo.org by default
 ```
 
+## Contributing
+
+Feel free to fork and create a pull request if there's any features missing for your own use case!
+
 ## Features
 
 ### Task Management
