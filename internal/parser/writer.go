@@ -128,6 +128,7 @@ func writeItem(writer *bufio.Writer, item *model.Item) error {
 	// Write scheduling info if not already in notes
 	hasScheduled := false
 	hasDeadline := false
+	hasClosed := false
 	hasLogbook := false
 	hasProperties := false
 	for _, note := range item.Notes {
@@ -137,11 +138,21 @@ func writeItem(writer *bufio.Writer, item *model.Item) error {
 		if strings.Contains(note, "DEADLINE:") {
 			hasDeadline = true
 		}
+		if strings.Contains(note, "CLOSED:") {
+			hasClosed = true
+		}
 		if strings.Contains(note, ":LOGBOOK:") {
 			hasLogbook = true
 		}
 		if strings.Contains(note, ":PROPERTIES:") {
 			hasProperties = true
+		}
+	}
+
+	if item.Closed != nil && !hasClosed {
+		closedLine := fmt.Sprintf("CLOSED: [%s]\n", formatClockTimestamp(*item.Closed))
+		if _, err := writer.WriteString(closedLine); err != nil {
+			return err
 		}
 	}
 

@@ -148,17 +148,24 @@ func (m uiModel) View() string {
 	for i, item := range items {
 		lineCount := 1 // The item itself
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-			// Build subtle visual guides for notes
-			guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+			// Build indentation for notes
 			var notePrefix strings.Builder
-			for j := 1; j <= item.Level; j++ {
-				notePrefix.WriteString(guideStyle.Render("· "))
+			if m.config.UI.ShowIndentationGuides {
+				guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.UI.IndentationGuideColor))
+				for j := 1; j <= item.Level; j++ {
+					notePrefix.WriteString(guideStyle.Render("· "))
+				}
+			} else {
+				// No visual guides, just use spaces
+				for j := 1; j <= item.Level; j++ {
+					notePrefix.WriteString("  ")
+				}
 			}
 			indent := notePrefix.String()
 			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
 			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
-			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
+			highlightedNotes := m.renderNotesWithHighlighting(wrappedNotes)
 			lineCount += len(highlightedNotes)
 		}
 		itemLineCount[i] = lineCount
@@ -215,17 +222,24 @@ func (m uiModel) View() string {
 
 				// Render remaining notes
 				if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-					// Build subtle visual guides for notes
-					guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+					// Build indentation for notes
 					var notePrefix strings.Builder
-					for i := 1; i <= item.Level; i++ {
-						notePrefix.WriteString(guideStyle.Render("· "))
+					if m.config.UI.ShowIndentationGuides {
+						guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.UI.IndentationGuideColor))
+						for i := 1; i <= item.Level; i++ {
+							notePrefix.WriteString(guideStyle.Render("· "))
+						}
+					} else {
+						// No visual guides, just use spaces
+						for i := 1; i <= item.Level; i++ {
+							notePrefix.WriteString("  ")
+						}
 					}
 					indent := notePrefix.String()
 					noteIndent := indent + "  "
 					filteredNotes := filterLogbookDrawer(item.Notes)
 					wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
-					highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
+					highlightedNotes := m.renderNotesWithHighlighting(wrappedNotes)
 					for noteIdx := linesToSkip - 1; noteIdx < len(highlightedNotes) && itemLines < availableHeight; noteIdx++ {
 						content.WriteString(indent)
 						content.WriteString("  " + highlightedNotes[noteIdx])
@@ -245,17 +259,24 @@ func (m uiModel) View() string {
 
 		// Show notes if not folded
 		if !item.Folded && len(item.Notes) > 0 && m.mode == modeList {
-			// Build subtle visual guides for notes
-			guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("235"))
+			// Build indentation for notes
 			var notePrefix strings.Builder
-			for i := 1; i <= item.Level; i++ {
-				notePrefix.WriteString(guideStyle.Render("· "))
+			if m.config.UI.ShowIndentationGuides {
+				guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.UI.IndentationGuideColor))
+				for i := 1; i <= item.Level; i++ {
+					notePrefix.WriteString(guideStyle.Render("· "))
+				}
+			} else {
+				// No visual guides, just use spaces
+				for i := 1; i <= item.Level; i++ {
+					notePrefix.WriteString("  ")
+				}
 			}
 			indent := notePrefix.String()
 			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
 			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
-			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
+			highlightedNotes := m.renderNotesWithHighlighting(wrappedNotes)
 			for _, note := range highlightedNotes {
 				if itemLines >= availableHeight {
 					break
@@ -626,8 +647,8 @@ func filterLogbookDrawer(notes []string) []string {
 			continue
 		}
 
-		// Skip SCHEDULED and DEADLINE lines
-		if strings.HasPrefix(trimmed, "SCHEDULED:") || strings.HasPrefix(trimmed, "DEADLINE:") {
+		// Skip SCHEDULED, DEADLINE, and CLOSED lines
+		if strings.HasPrefix(trimmed, "SCHEDULED:") || strings.HasPrefix(trimmed, "DEADLINE:") || strings.HasPrefix(trimmed, "CLOSED:") {
 			continue
 		}
 
@@ -661,7 +682,7 @@ func wrapNoteLines(notes []string, width int, indent string) []string {
 }
 
 // renderNotesWithHighlighting renders notes with syntax highlighting for code blocks
-func renderNotesWithHighlighting(notes []string) []string {
+func (m uiModel) renderNotesWithHighlighting(notes []string) []string {
 	if len(notes) == 0 {
 		return notes
 	}
@@ -762,7 +783,13 @@ func renderNotesWithHighlighting(notes []string) []string {
 		if inCodeBlock {
 			codeLines = append(codeLines, note)
 		} else {
-			result = append(result, note)
+			// Apply org-mode syntax highlighting to non-code text if enabled
+			if m.config.UI.OrgSyntaxHighlighting {
+				highlighted := highlightCode(note, "org")
+				result = append(result, highlighted)
+			} else {
+				result = append(result, note)
+			}
 		}
 	}
 
@@ -894,14 +921,21 @@ func (m uiModel) renderItem(item *model.Item, isCursor bool) string {
 	var b strings.Builder
 
 	// Indentation with subtle visual nesting guides
-	guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // Very subtle gray
-	for i := 1; i < item.Level; i++ {
-		if i == item.Level-1 {
-			// Last level before the item - use subtle dot connector
-			b.WriteString(guideStyle.Render("· "))
-		} else {
-			// Parent levels - use subtle dot
-			b.WriteString(guideStyle.Render("· "))
+	if m.config.UI.ShowIndentationGuides {
+		guideStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.UI.IndentationGuideColor))
+		for i := 1; i < item.Level; i++ {
+			if i == item.Level-1 {
+				// Last level before the item - use subtle dot connector
+				b.WriteString(guideStyle.Render("· "))
+			} else {
+				// Parent levels - use subtle dot
+				b.WriteString(guideStyle.Render("· "))
+			}
+		}
+	} else {
+		// No visual guides, just use spaces for indentation
+		for i := 1; i < item.Level; i++ {
+			b.WriteString("  ")
 		}
 	}
 

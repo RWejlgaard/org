@@ -21,6 +21,7 @@ type Item struct {
 	Tags         []string     // Tags for this item (e.g., :work:urgent:)
 	Scheduled    *time.Time
 	Deadline     *time.Time
+	Closed       *time.Time   // Closed timestamp (when task was marked as done)
 	Effort       string       // Effort estimate (e.g., "8h", "2d")
 	Notes        []string     // Notes/content under the heading
 	Children     []*Item      // Sub-items

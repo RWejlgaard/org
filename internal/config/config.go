@@ -91,9 +91,12 @@ type StatesConfig struct {
 
 // UIConfig holds UI-related configurations
 type UIConfig struct {
-	HelpTextWidth      int `toml:"help_text_width"`
-	MinTerminalWidth   int `toml:"min_terminal_width"`
-	AgendaDays         int `toml:"agenda_days"`
+	HelpTextWidth         int    `toml:"help_text_width"`
+	MinTerminalWidth      int    `toml:"min_terminal_width"`
+	AgendaDays            int    `toml:"agenda_days"`
+	OrgSyntaxHighlighting bool   `toml:"org_syntax_highlighting"`
+	ShowIndentationGuides bool   `toml:"show_indentation_guides"`
+	IndentationGuideColor string `toml:"indentation_guide_color"`
 }
 
 // DefaultConfig returns the default configuration
@@ -161,9 +164,12 @@ func DefaultConfig() *Config {
 			DefaultNewTaskState: "TODO",
 		},
 		UI: UIConfig{
-			HelpTextWidth:    22,
-			MinTerminalWidth: 40,
-			AgendaDays:       7,
+			HelpTextWidth:         22,
+			MinTerminalWidth:      40,
+			AgendaDays:            7,
+			OrgSyntaxHighlighting: true,
+			ShowIndentationGuides: true,
+			IndentationGuideColor: "245",
 		},
 	}
 }
@@ -371,10 +377,11 @@ func (c *Config) fillDefaults() {
 	// Fill states if empty
 	if len(c.States.States) == 0 {
 		c.States.States = defaults.States.States
-	}
-	if c.States.DefaultNewTaskState == "" {
+		// Also set the default new task state since the entire states section is missing
 		c.States.DefaultNewTaskState = defaults.States.DefaultNewTaskState
 	}
+	// Note: We don't fill DefaultNewTaskState if States.States is non-empty because
+	// an empty string is a valid intentional value meaning "no default state".
 
 	// Fill UI if zero values
 	if c.UI.HelpTextWidth == 0 {
@@ -385,6 +392,9 @@ func (c *Config) fillDefaults() {
 	}
 	if c.UI.AgendaDays == 0 {
 		c.UI.AgendaDays = defaults.UI.AgendaDays
+	}
+	if c.UI.IndentationGuideColor == "" {
+		c.UI.IndentationGuideColor = defaults.UI.IndentationGuideColor
 	}
 }
 

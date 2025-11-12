@@ -112,7 +112,7 @@ func (m *uiModel) updateScrollOffset(availableHeight int) {
 			noteIndent := indent + "  "
 			filteredNotes := filterLogbookDrawer(item.Notes)
 			wrappedNotes := wrapNoteLines(filteredNotes, m.width, noteIndent)
-			highlightedNotes := renderNotesWithHighlighting(wrappedNotes)
+			highlightedNotes := m.renderNotesWithHighlighting(wrappedNotes)
 			lineCount += len(highlightedNotes)
 		}
 		itemLineCount[i] = lineCount

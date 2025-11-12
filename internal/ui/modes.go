@@ -726,6 +726,7 @@ func (m *uiModel) cycleStateForward(item *model.Item) {
 	// Find current state index
 	currentIndex := -1
 	currentState := string(item.State)
+	lastStateIndex := len(stateNames) - 1
 
 	// Handle empty state
 	if currentState == "" {
@@ -739,15 +740,51 @@ func (m *uiModel) cycleStateForward(item *model.Item) {
 		}
 	}
 
+	// Store the old state to check if we're transitioning to/from DONE
+	oldState := currentState
+	var newState string
+
 	// Cycle forward
 	if currentIndex < 0 || currentIndex >= len(stateNames)-1 {
 		if currentIndex == len(stateNames)-1 {
-			item.State = model.TodoState("") // Back to empty
+			newState = "" // Back to empty
 		} else {
-			item.State = model.TodoState(stateNames[0]) // First state
+			newState = stateNames[0] // First state
 		}
 	} else {
-		item.State = model.TodoState(stateNames[currentIndex+1])
+		newState = stateNames[currentIndex+1]
+	}
+
+	// Update the item state
+	item.State = model.TodoState(newState)
+
+	// Manage CLOSED timestamp
+	wasInDoneState := (oldState == stateNames[lastStateIndex])
+	isInDoneState := (newState == stateNames[lastStateIndex])
+
+	if isInDoneState && !wasInDoneState {
+		// Moving TO done state - add CLOSED timestamp
+		now := time.Now()
+		item.Closed = &now
+		// Remove any existing CLOSED line from notes
+		var filteredNotes []string
+		for _, note := range item.Notes {
+			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
+				filteredNotes = append(filteredNotes, note)
+			}
+		}
+		item.Notes = filteredNotes
+	} else if wasInDoneState && !isInDoneState {
+		// Moving FROM done state - remove CLOSED timestamp
+		item.Closed = nil
+		// Remove any existing CLOSED line from notes
+		var filteredNotes []string
+		for _, note := range item.Notes {
+			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
+				filteredNotes = append(filteredNotes, note)
+			}
+		}
+		item.Notes = filteredNotes
 	}
 }
 
@@ -760,6 +797,7 @@ func (m *uiModel) cycleStateBackward(item *model.Item) {
 	// Find current state index
 	currentIndex := -1
 	currentState := string(item.State)
+	lastStateIndex := len(stateNames) - 1
 
 	// Handle empty state
 	if currentState == "" {
@@ -773,13 +811,49 @@ func (m *uiModel) cycleStateBackward(item *model.Item) {
 		}
 	}
 
+	// Store the old state to check if we're transitioning to/from DONE
+	oldState := currentState
+	var newState string
+
 	// Cycle backward
 	if currentIndex <= 0 {
-		item.State = model.TodoState("") // Empty state
+		newState = "" // Empty state
 	} else if currentIndex > len(stateNames) {
-		item.State = model.TodoState(stateNames[len(stateNames)-1])
+		newState = stateNames[len(stateNames)-1]
 	} else {
-		item.State = model.TodoState(stateNames[currentIndex-1])
+		newState = stateNames[currentIndex-1]
+	}
+
+	// Update the item state
+	item.State = model.TodoState(newState)
+
+	// Manage CLOSED timestamp
+	wasInDoneState := (oldState == stateNames[lastStateIndex])
+	isInDoneState := (newState == stateNames[lastStateIndex])
+
+	if isInDoneState && !wasInDoneState {
+		// Moving TO done state - add CLOSED timestamp
+		now := time.Now()
+		item.Closed = &now
+		// Remove any existing CLOSED line from notes
+		var filteredNotes []string
+		for _, note := range item.Notes {
+			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
+				filteredNotes = append(filteredNotes, note)
+			}
+		}
+		item.Notes = filteredNotes
+	} else if wasInDoneState && !isInDoneState {
+		// Moving FROM done state - remove CLOSED timestamp
+		item.Closed = nil
+		// Remove any existing CLOSED line from notes
+		var filteredNotes []string
+		for _, note := range item.Notes {
+			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
+				filteredNotes = append(filteredNotes, note)
+			}
+		}
+		item.Notes = filteredNotes
 	}
 }
 

@@ -13,7 +13,8 @@ import (
 type settingsSection int
 
 const (
-	settingsSectionTags settingsSection = iota
+	settingsSectionGeneral settingsSection = iota
+	settingsSectionTags
 	settingsSectionStates
 	settingsSectionKeybindings
 )
@@ -76,7 +77,7 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.Left):
 			// Previous section
-			if m.settingsSection > settingsSectionTags {
+			if m.settingsSection > settingsSectionGeneral {
 				m.settingsSection--
 				m.settingsCursor = 0
 				m.settingsScroll = 0
@@ -101,6 +102,8 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Capture):
 			// Add new tag or state
 			switch m.settingsSection {
+			case settingsSectionGeneral:
+				// No capture action in General
 			case settingsSectionTags:
 				m.addNewTag()
 			case settingsSectionStates:
@@ -128,6 +131,8 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 // getSettingsItemCount returns the number of items in the current settings view
 func (m *uiModel) getSettingsItemCount() int {
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		return 3 // Org syntax highlighting toggle, show indentation guides toggle, indentation guide color
 	case settingsSectionTags:
 		return len(m.config.Tags.Tags) + 1 // +1 for "Add new tag" option
 	case settingsSectionStates:
@@ -172,6 +177,40 @@ func (m *uiModel) updateSettingsScrollOffset() {
 // startSettingsEdit starts editing a settings item
 func (m *uiModel) startSettingsEdit() {
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		// Setting 0: Toggle org syntax highlighting
+		if m.settingsCursor == 0 {
+			m.config.UI.OrgSyntaxHighlighting = !m.config.UI.OrgSyntaxHighlighting
+			if m.config.UI.OrgSyntaxHighlighting {
+				m.setStatus("Org syntax highlighting enabled (saved)")
+			} else {
+				m.setStatus("Org syntax highlighting disabled (saved)")
+			}
+			// Auto-save
+			if err := m.config.Save(); err != nil {
+				m.setStatus(fmt.Sprintf("Error auto-saving config: %v", err))
+			}
+		}
+		// Setting 1: Toggle show indentation guides
+		if m.settingsCursor == 1 {
+			m.config.UI.ShowIndentationGuides = !m.config.UI.ShowIndentationGuides
+			if m.config.UI.ShowIndentationGuides {
+				m.setStatus("Indentation guides enabled (saved)")
+			} else {
+				m.setStatus("Indentation guides disabled (saved)")
+			}
+			// Auto-save
+			if err := m.config.Save(); err != nil {
+				m.setStatus(fmt.Sprintf("Error auto-saving config: %v", err))
+			}
+		}
+		// Setting 2: Edit indentation guide color
+		if m.settingsCursor == 2 {
+			m.textinput.SetValue(m.config.UI.IndentationGuideColor)
+			m.textinput.Placeholder = "Enter color (e.g., 245, 99)"
+			m.textinput.Focus()
+		}
+		return
 	case settingsSectionTags:
 		if m.settingsCursor >= len(m.config.Tags.Tags) {
 			return
@@ -237,6 +276,23 @@ func (m *uiModel) startSettingsEdit() {
 // saveSettingsEdit saves the edited value and auto-saves to disk
 func (m *uiModel) saveSettingsEdit() {
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		// Setting 2: Indentation guide color
+		if m.settingsCursor == 2 {
+			newColor := strings.TrimSpace(m.textinput.Value())
+			if newColor != "" {
+				m.config.UI.IndentationGuideColor = newColor
+				m.setStatus(fmt.Sprintf("Indentation guide color set to '%s' (saved)", newColor))
+				// Auto-save
+				if err := m.config.Save(); err != nil {
+					m.setStatus(fmt.Sprintf("Error auto-saving config: %v", err))
+				} else {
+					// Reload styles
+					m.styles = newStyleMapFromConfig(m.config)
+				}
+			}
+		}
+		return
 	case settingsSectionTags:
 		if m.settingsCursor >= len(m.config.Tags.Tags) {
 			return
@@ -350,6 +406,9 @@ func (m *uiModel) saveSettingsEdit() {
 // deleteSettingsItem deletes the current settings item and auto-saves
 func (m *uiModel) deleteSettingsItem() {
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		// Cannot delete general settings
+		return
 	case settingsSectionTags:
 		if m.settingsCursor >= len(m.config.Tags.Tags) {
 			return
@@ -437,6 +496,12 @@ func (m *uiModel) viewSettings() string {
 	activeTabStyle := lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(lipgloss.Color(m.config.Colors.Title))
 
 	tabs := ""
+	if m.settingsSection == settingsSectionGeneral {
+		tabs += activeTabStyle.Render("[General]")
+	} else {
+		tabs += tabStyle.Render("General")
+	}
+	tabs += " "
 	if m.settingsSection == settingsSectionTags {
 		tabs += activeTabStyle.Render("[Tags]")
 	} else {
@@ -459,6 +524,8 @@ func (m *uiModel) viewSettings() string {
 	// Instructions
 	var instructions string
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Toggle setting\nctrl+s: Save • q/,: Exit"
 	case settingsSectionTags:
 		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Edit • D: Delete\nc: Add new tag • ctrl+s: Save • q/,: Exit"
 	case settingsSectionStates:
@@ -470,6 +537,8 @@ func (m *uiModel) viewSettings() string {
 
 	// Render the appropriate section
 	switch m.settingsSection {
+	case settingsSectionGeneral:
+		content.WriteString(m.viewSettingsGeneral())
 	case settingsSectionTags:
 		content.WriteString(m.viewSettingsTags())
 	case settingsSectionStates:
@@ -484,6 +553,68 @@ func (m *uiModel) viewSettings() string {
 		content.WriteString(m.textinput.View() + "\n")
 		content.WriteString(m.styles.statusStyle.Render("Enter: Save • ESC: Cancel") + "\n")
 	}
+
+	return content.String()
+}
+
+// viewSettingsGeneral renders the general settings section
+func (m *uiModel) viewSettingsGeneral() string {
+	var content strings.Builder
+
+	// Calculate visible window
+	reservedLines := 10
+	if m.textinput.Focused() {
+		reservedLines += 3
+	}
+	availableHeight := m.height - reservedLines
+	if availableHeight < 3 {
+		availableHeight = 3
+	}
+
+	enabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Bold(true)
+	disabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	colorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.UI.IndentationGuideColor))
+
+	// Setting 0: Org syntax highlighting toggle
+	line := ""
+	if m.settingsCursor == 0 && !m.textinput.Focused() {
+		line += "▶ "
+	} else {
+		line += "  "
+	}
+	line += "Org syntax highlighting: "
+	if m.config.UI.OrgSyntaxHighlighting {
+		line += enabledStyle.Render("Enabled")
+	} else {
+		line += disabledStyle.Render("Disabled")
+	}
+	content.WriteString(line + "\n")
+
+	// Setting 1: Show indentation guides toggle
+	line = ""
+	if m.settingsCursor == 1 && !m.textinput.Focused() {
+		line += "▶ "
+	} else {
+		line += "  "
+	}
+	line += "Show indentation guides: "
+	if m.config.UI.ShowIndentationGuides {
+		line += enabledStyle.Render("Enabled")
+	} else {
+		line += disabledStyle.Render("Disabled")
+	}
+	content.WriteString(line + "\n")
+
+	// Setting 2: Indentation guide color
+	line = ""
+	if m.settingsCursor == 2 && !m.textinput.Focused() {
+		line += "▶ "
+	} else {
+		line += "  "
+	}
+	line += "Indentation guide color: "
+	line += colorStyle.Render(m.config.UI.IndentationGuideColor)
+	content.WriteString(line + "\n")
 
 	return content.String()
 }

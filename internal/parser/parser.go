@@ -14,15 +14,16 @@ import (
 
 // Parser patterns
 var (
-	scheduledPattern    = regexp.MustCompile(`SCHEDULED:\s*<([^>]+)>`)
-	deadlinePattern     = regexp.MustCompile(`DEADLINE:\s*<([^>]+)>`)
-	clockPattern        = regexp.MustCompile(`CLOCK:\s*\[([^\]]+)\](?:--\[([^\]]+)\])?`)
-	effortPattern       = regexp.MustCompile(`^\s*:EFFORT:\s*(.+)$`)
-	logbookDrawerStart  = regexp.MustCompile(`^\s*:LOGBOOK:\s*$`)
+	scheduledPattern      = regexp.MustCompile(`SCHEDULED:\s*<([^>]+)>`)
+	deadlinePattern       = regexp.MustCompile(`DEADLINE:\s*<([^>]+)>`)
+	closedPattern         = regexp.MustCompile(`CLOSED:\s*\[([^\]]+)\]`)
+	clockPattern          = regexp.MustCompile(`CLOCK:\s*\[([^\]]+)\](?:--\[([^\]]+)\])?`)
+	effortPattern         = regexp.MustCompile(`^\s*:EFFORT:\s*(.+)$`)
+	logbookDrawerStart    = regexp.MustCompile(`^\s*:LOGBOOK:\s*$`)
 	propertiesDrawerStart = regexp.MustCompile(`^\s*:PROPERTIES:\s*$`)
-	drawerEnd           = regexp.MustCompile(`^\s*:END:\s*$`)
-	codeBlockStart      = regexp.MustCompile(`^\s*#\+BEGIN_SRC`)
-	codeBlockEnd        = regexp.MustCompile(`^\s*#\+END_SRC`)
+	drawerEnd             = regexp.MustCompile(`^\s*:END:\s*$`)
+	codeBlockStart        = regexp.MustCompile(`^\s*#\+BEGIN_SRC`)
+	codeBlockEnd          = regexp.MustCompile(`^\s*#\+END_SRC`)
 )
 
 // buildHeadingPattern creates a regex pattern that matches configured states
@@ -184,6 +185,13 @@ func ParseOrgFile(path string, cfg *config.Config) (*model.OrgFile, error) {
 			if matches := deadlinePattern.FindStringSubmatch(line); matches != nil {
 				if t, err := parseOrgDate(matches[1]); err == nil {
 					currentItem.Deadline = &t
+				}
+			}
+
+			// Check for CLOSED
+			if matches := closedPattern.FindStringSubmatch(line); matches != nil {
+				if t, err := parseClockTimestamp(matches[1]); err == nil {
+					currentItem.Closed = &t
 				}
 			}
 
