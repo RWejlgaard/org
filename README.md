@@ -23,6 +23,9 @@ org tasks.org            # Open specific org file
 org /path/to/work.org    # Open specific org file with path
 org -m                   # Multi-file: Load all .org files in current directory
 org -m /path/to/dir      # Multi-file: Load all .org files in specified directory
+org -c                   # Quick capture mode
+org -c "Task description" # Quick capture with pre-filled text
+echo "Task" | org        # Pipe text to capture
 ```
 
 ### Single-File Mode (Default)
@@ -34,6 +37,20 @@ org                      # Opens ./todo.org
 org tasks.org            # Opens tasks.org
 org ~/work/project.org   # Opens specific file
 ```
+
+### Quick Capture Mode
+
+Use the `-c` or `--capture` flag to quickly add tasks without navigating through the UI:
+
+```bash
+org -c                           # Open directly in capture mode
+org -c "Buy groceries"           # Capture with pre-filled text
+org -c "Write report" tasks.org  # Capture to specific file
+echo "Meeting notes" | org       # Pipe text to capture
+echo "Task" | org ~/work.org     # Pipe to specific file
+```
+
+This is perfect for quickly capturing tasks from scripts, terminal workflows, or shell aliases. The capture mode skips the need to press 'c' once inside the application, making it faster to add quick TODO items.
 
 ### Multi-File Mode
 
