@@ -55,7 +55,7 @@ type uiModel struct {
 	captureCursor    int             // Store cursor position when entering capture mode
 }
 
-func InitialModel(orgFile *model.OrgFile, cfg *config.Config) uiModel {
+func InitialModel(orgFile *model.OrgFile, cfg *config.Config, captureMode bool, captureText string) uiModel {
 	ta := textarea.New()
 	ta.Placeholder = "Enter notes here (code blocks supported)..."
 	ta.ShowLineNumbers = false
@@ -67,10 +67,16 @@ func InitialModel(orgFile *model.OrgFile, cfg *config.Config) uiModel {
 	h := help.New()
 	h.ShowAll = false
 
+	mode := modeList
+	if captureMode {
+		mode = modeCapture
+		ti.SetValue(strings.TrimSpace(captureText))
+	}
+
 	return uiModel{
 		orgFile:   orgFile,
 		cursor:    0,
-		mode:      modeList,
+		mode:      mode,
 		help:      h,
 		keys:      newKeyMapFromConfig(cfg),
 		styles:    newStyleMapFromConfig(cfg),
@@ -81,6 +87,9 @@ func InitialModel(orgFile *model.OrgFile, cfg *config.Config) uiModel {
 }
 
 func (m uiModel) Init() tea.Cmd {
+	if m.mode == modeCapture {
+		return textinput.Blink
+	}
 	return nil
 }
 
@@ -140,8 +149,12 @@ func (m *uiModel) updateScrollOffset(availableHeight int) {
 }
 
 // RunUI starts the terminal UI
-func RunUI(orgFile *model.OrgFile, cfg *config.Config) error {
-	p := tea.NewProgram(InitialModel(orgFile, cfg), tea.WithAltScreen())
+func RunUI(orgFile *model.OrgFile, cfg *config.Config, captureMode bool, captureText string) error {
+	m := InitialModel(orgFile, cfg, captureMode, captureText)
+	if captureMode {
+		m.textinput.Focus()
+	}
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }
