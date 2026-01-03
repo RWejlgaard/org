@@ -26,6 +26,7 @@ type keyMap struct {
 	Delete        key.Binding
 	Save          key.Binding
 	ToggleFold    key.Binding
+	ToggleFoldAll key.Binding
 	EditNotes     key.Binding
 	ToggleReorder key.Binding
 	ClockIn       key.Binding
@@ -86,6 +87,10 @@ func newKeyMapFromConfig(cfg *config.Config) keyMap {
 		ToggleFold: key.NewBinding(
 			key.WithKeys(kb.ToggleFold...),
 			key.WithHelp(formatKeyHelp(kb.ToggleFold), "fold/unfold"),
+		),
+		ToggleFoldAll: key.NewBinding(
+			key.WithKeys(kb.ToggleFoldAll...),
+			key.WithHelp(formatKeyHelp(kb.ToggleFoldAll), "fold/unfold all"),
 		),
 		EditNotes: key.NewBinding(
 			key.WithKeys(kb.EditNotes...),
@@ -188,7 +193,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	// This will be overridden by custom rendering in viewFullHelp
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
-		{k.ToggleFold, k.EditNotes, k.ToggleReorder},
+		{k.ToggleFold, k.ToggleFoldAll, k.EditNotes, k.ToggleReorder},
 		{k.Capture, k.AddSubTask, k.Delete, k.Save},
 		{k.ToggleView, k.Help, k.Quit},
 	}
@@ -198,7 +203,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 func (k keyMap) getAllBindings() []key.Binding {
 	return []key.Binding{
 		k.Up, k.Down, k.Left, k.Right,
-		k.ToggleFold, k.EditNotes, k.ToggleReorder,
+		k.ToggleFold, k.ToggleFoldAll, k.EditNotes, k.ToggleReorder,
 		k.Capture, k.AddSubTask, k.Delete, k.Save,
 		k.ClockIn, k.ClockOut, k.SetDeadline, k.SetScheduled, k.SetPriority, k.SetEffort,
 		k.TagItem, k.Settings, k.ToggleView, k.Help, k.Quit,

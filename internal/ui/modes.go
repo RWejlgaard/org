@@ -155,6 +155,46 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case key.Matches(msg, m.keys.ToggleFoldAll):
+			if len(m.orgFile.Items) > 0 {
+				// Check if any top-level item is not folded
+				anyUnfolded := false
+				for _, item := range m.orgFile.Items {
+					if !item.Folded {
+						anyUnfolded = true
+						break
+					}
+				}
+
+				if anyUnfolded {
+					// Fold all items recursively (collapse all)
+					var foldAll func([]*model.Item)
+					foldAll = func(items []*model.Item) {
+						for _, item := range items {
+							item.Folded = true
+							if len(item.Children) > 0 {
+								foldAll(item.Children)
+							}
+						}
+					}
+					foldAll(m.orgFile.Items)
+					m.setStatus("All items folded")
+				} else {
+					// Unfold everything recursively
+					var unfoldAll func([]*model.Item)
+					unfoldAll = func(items []*model.Item) {
+						for _, item := range items {
+							item.Folded = false
+							if len(item.Children) > 0 {
+								unfoldAll(item.Children)
+							}
+						}
+					}
+					unfoldAll(m.orgFile.Items)
+					m.setStatus("All items unfolded")
+				}
+			}
+
 		case key.Matches(msg, m.keys.EditNotes):
 			items := m.getVisibleItems()
 			if len(items) > 0 && m.cursor < len(items) {

@@ -109,6 +109,7 @@ Feel free to fork and create a pull request if there's any features missing for 
 - **Syntax Highlighting**: Code blocks are automatically highlighted (supports both ```lang and #+BEGIN_SRC formats)
 - **Markdown Support**: Use markdown-style code blocks in your notes
 - **Drawer Management**: LOGBOOK and PROPERTIES drawers are automatically filtered in list view
+- **Fold/Unfold All**: Fold/Unfold all items with shift+tab
 
 ### Keybindings
 
@@ -118,6 +119,7 @@ Feel free to fork and create a pull request if there's any features missing for 
 | `←/h`, `→/l` | Cycle state backward/forward |
 | `t` or `space` | Cycle TODO state |
 | `tab` | Fold/unfold item |
+| `shift+tab` | Fold/Unfold all items |
 | `enter` | Edit notes |
 | `c` | Capture new TODO |
 | `s` | Add sub-task |
