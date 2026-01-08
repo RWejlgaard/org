@@ -128,6 +128,7 @@ Feel free to fork and create a pull request if there's any features missing for 
 | `i` | Clock in |
 | `o` | Clock out |
 | `d` | Set deadline |
+| `S` | Set scheduled date |
 | `p` | Set priority |
 | `e` | Set effort |
 | `r` | Toggle reorder mode |

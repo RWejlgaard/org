@@ -22,6 +22,7 @@ const (
 	modeCapture
 	modeAddSubTask
 	modeSetDeadline
+	modeSetScheduled
 	modeSetPriority
 	modeSetEffort
 	modeHelp
@@ -31,28 +32,28 @@ const (
 )
 
 type uiModel struct {
-	orgFile        *model.OrgFile
-	cursor         int
-	scrollOffset   int // Track the scroll position
-	helpScroll     int // Track scroll position in help mode
-	mode           viewMode
-	help           help.Model
-	keys           keyMap
-	styles         styleMap
-	config         *config.Config
-	width          int
-	height         int
-	statusMsg      string
-	statusExpiry   time.Time
-	editingItem    *model.Item
-	textarea       textarea.Model
-	textinput      textinput.Model
-	itemToDelete     *model.Item
-	reorderMode      bool
-	settingsCursor   int             // Cursor position in settings view
-	settingsScroll   int             // Scroll position in settings view
-	settingsSection  settingsSection // Current settings section/tab
-	captureCursor    int             // Store cursor position when entering capture mode
+	orgFile         *model.OrgFile
+	cursor          int
+	scrollOffset    int // Track the scroll position
+	helpScroll      int // Track scroll position in help mode
+	mode            viewMode
+	help            help.Model
+	keys            keyMap
+	styles          styleMap
+	config          *config.Config
+	width           int
+	height          int
+	statusMsg       string
+	statusExpiry    time.Time
+	editingItem     *model.Item
+	textarea        textarea.Model
+	textinput       textinput.Model
+	itemToDelete    *model.Item
+	reorderMode     bool
+	settingsCursor  int             // Cursor position in settings view
+	settingsScroll  int             // Scroll position in settings view
+	settingsSection settingsSection // Current settings section/tab
+	captureCursor   int             // Store cursor position when entering capture mode
 }
 
 func InitialModel(orgFile *model.OrgFile, cfg *config.Config, captureMode bool, captureText string) uiModel {
