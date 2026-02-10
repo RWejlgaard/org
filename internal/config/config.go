@@ -41,6 +41,7 @@ type KeybindingsConfig struct {
 	ClockIn       []string `toml:"clock_in"`
 	ClockOut      []string `toml:"clock_out"`
 	SetDeadline   []string `toml:"set_deadline"`
+	SetScheduled  []string `toml:"set_scheduled"`
 	SetPriority   []string `toml:"set_priority"`
 	SetEffort     []string `toml:"set_effort"`
 	Help          []string `toml:"help"`
@@ -124,6 +125,7 @@ func DefaultConfig() *Config {
 			ClockIn:       []string{"i"},
 			ClockOut:      []string{"o"},
 			SetDeadline:   []string{"d"},
+			SetScheduled:  []string{"S"},
 			SetPriority:   []string{"p"},
 			SetEffort:     []string{"e"},
 			Help:          []string{"?"},
@@ -311,6 +313,9 @@ func (c *Config) fillDefaults() {
 	}
 	if len(c.Keybindings.SetDeadline) == 0 {
 		c.Keybindings.SetDeadline = defaults.Keybindings.SetDeadline
+	}
+	if len(c.Keybindings.SetScheduled) == 0 {
+		c.Keybindings.SetScheduled = defaults.Keybindings.SetScheduled
 	}
 	if len(c.Keybindings.SetPriority) == 0 {
 		c.Keybindings.SetPriority = defaults.Keybindings.SetPriority
@@ -567,6 +572,7 @@ func (c *Config) GetAllKeybindings() map[string][]string {
 		"clock_in":       c.Keybindings.ClockIn,
 		"clock_out":      c.Keybindings.ClockOut,
 		"set_deadline":   c.Keybindings.SetDeadline,
+		"set_scheduled":  c.Keybindings.SetScheduled,
 		"set_priority":   c.Keybindings.SetPriority,
 		"set_effort":     c.Keybindings.SetEffort,
 		"help":           c.Keybindings.Help,

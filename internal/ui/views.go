@@ -78,6 +78,8 @@ func (m uiModel) View() string {
 		return m.viewAddSubTask()
 	case modeSetDeadline:
 		return m.viewSetDeadline()
+	case modeSetScheduled:
+		return m.viewSetScheduled()
 	case modeSetPriority:
 		return m.viewSetPriority()
 	case modeSetEffort:
@@ -379,6 +381,14 @@ func (m uiModel) viewAddSubTask() string {
 }
 
 func (m uiModel) viewSetDeadline() string {
+	return m.viewSetDate("Set Deadline", "Leave empty to clear deadline")
+}
+
+func (m uiModel) viewSetScheduled() string {
+	return m.viewSetDate("Set Scheduled Date", "Leave empty to clear scheduled date")
+}
+
+func (m uiModel) viewSetDate(title, helpMsg string) string {
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("141")).
@@ -386,7 +396,7 @@ func (m uiModel) viewSetDeadline() string {
 		Width(60)
 
 	var content strings.Builder
-	content.WriteString(m.styles.titleStyle.Render("Set Deadline"))
+	content.WriteString(m.styles.titleStyle.Render(title))
 	content.WriteString("\n")
 	if m.editingItem != nil {
 		content.WriteString(m.styles.statusStyle.Render(fmt.Sprintf("For: %s", m.editingItem.Title)))
@@ -396,7 +406,7 @@ func (m uiModel) viewSetDeadline() string {
 	content.WriteString("\n\n")
 	content.WriteString(m.styles.statusStyle.Render("Examples: 2025-12-31, +7 (7 days from now)"))
 	content.WriteString("\n")
-	content.WriteString(m.styles.statusStyle.Render("Leave empty to clear deadline"))
+	content.WriteString(m.styles.statusStyle.Render(helpMsg))
 	content.WriteString("\n")
 	content.WriteString(m.styles.statusStyle.Render("Press Enter to save • ESC to cancel"))
 
@@ -488,7 +498,7 @@ func (m uiModel) viewHelp() string {
 	navigationBindings := []key.Binding{m.keys.Up, m.keys.Down, m.keys.Left, m.keys.Right}
 	itemBindings := []key.Binding{m.keys.ToggleFold, m.keys.EditNotes, m.keys.CycleState}
 	taskBindings := []key.Binding{m.keys.Capture, m.keys.AddSubTask, m.keys.Delete}
-	timeBindings := []key.Binding{m.keys.ClockIn, m.keys.ClockOut, m.keys.SetDeadline, m.keys.SetEffort}
+	timeBindings := []key.Binding{m.keys.ClockIn, m.keys.ClockOut, m.keys.SetDeadline, m.keys.SetScheduled, m.keys.SetEffort}
 	organizationBindings := []key.Binding{m.keys.SetPriority, m.keys.TagItem, m.keys.ShiftUp, m.keys.ShiftDown, m.keys.ToggleReorder}
 	viewBindings := []key.Binding{m.keys.ToggleView, m.keys.Settings, m.keys.Save, m.keys.Help, m.keys.Quit}
 

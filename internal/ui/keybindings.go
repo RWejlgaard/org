@@ -31,6 +31,7 @@ type keyMap struct {
 	ClockIn       key.Binding
 	ClockOut      key.Binding
 	SetDeadline   key.Binding
+	SetScheduled  key.Binding
 	SetPriority   key.Binding
 	SetEffort     key.Binding
 	Settings      key.Binding
@@ -126,6 +127,10 @@ func newKeyMapFromConfig(cfg *config.Config) keyMap {
 			key.WithKeys(kb.SetDeadline...),
 			key.WithHelp(formatKeyHelp(kb.SetDeadline), "set deadline"),
 		),
+		SetScheduled: key.NewBinding(
+			key.WithKeys(kb.SetScheduled...),
+			key.WithHelp(formatKeyHelp(kb.SetScheduled), "set scheduled"),
+		),
 		SetPriority: key.NewBinding(
 			key.WithKeys(kb.SetPriority...),
 			key.WithHelp(formatKeyHelp(kb.SetPriority), "set priority"),
@@ -195,7 +200,7 @@ func (k keyMap) getAllBindings() []key.Binding {
 		k.Up, k.Down, k.Left, k.Right,
 		k.ToggleFold, k.EditNotes, k.ToggleReorder,
 		k.Capture, k.AddSubTask, k.Delete, k.Save,
-		k.ClockIn, k.ClockOut, k.SetDeadline, k.SetPriority, k.SetEffort,
+		k.ClockIn, k.ClockOut, k.SetDeadline, k.SetScheduled, k.SetPriority, k.SetEffort,
 		k.TagItem, k.Settings, k.ToggleView, k.Help, k.Quit,
 	}
 }

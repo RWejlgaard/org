@@ -26,6 +26,8 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateAddSubTask(msg)
 	case modeSetDeadline:
 		return m.updateSetDeadline(msg)
+	case modeSetScheduled:
+		return m.updateSetScheduled(msg)
 	case modeSetPriority:
 		return m.updateSetPriority(msg)
 	case modeSetEffort:
@@ -281,6 +283,17 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, textinput.Blink
 			}
 
+		case key.Matches(msg, m.keys.SetScheduled):
+			items := m.getVisibleItems()
+			if len(items) > 0 && m.cursor < len(items) {
+				m.editingItem = items[m.cursor]
+				m.mode = modeSetScheduled
+				m.textinput.SetValue("")
+				m.textinput.Placeholder = "YYYY-MM-DD or +N (days from today)"
+				m.textinput.Focus()
+				return m, textinput.Blink
+			}
+
 		case key.Matches(msg, m.keys.SetPriority):
 			items := m.getVisibleItems()
 			if len(items) > 0 && m.cursor < len(items) {
@@ -521,83 +534,11 @@ func (m uiModel) updateAddSubTask(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m uiModel) updateSetDeadline(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.textinput.Width = 50
-
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
-			input := strings.TrimSpace(m.textinput.Value())
-			if m.editingItem != nil {
-				if input == "" {
-					// Empty input clears the deadline
-					m.editingItem.Deadline = nil
-					// Remove DEADLINE line from notes (only lines starting with DEADLINE:)
-					var filteredNotes []string
-					for _, note := range m.editingItem.Notes {
-						trimmedNote := strings.TrimSpace(note)
-						if !strings.HasPrefix(trimmedNote, "DEADLINE:") {
-							filteredNotes = append(filteredNotes, note)
-						}
-					}
-					m.editingItem.Notes = filteredNotes
-					m.setStatus("Deadline cleared!")
-				} else {
-					deadline, err := parseDeadlineInput(input)
-					if err != nil {
-						m.setStatus(fmt.Sprintf("Invalid date: %v", err))
-					} else {
-						m.editingItem.Deadline = &deadline
-						// Also update or add DEADLINE line in notes
-						updatedNotes := false
-						for i, note := range m.editingItem.Notes {
-							trimmedNote := strings.TrimSpace(note)
-							if strings.HasPrefix(trimmedNote, "DEADLINE:") {
-								m.editingItem.Notes[i] = fmt.Sprintf("DEADLINE: <%s>", parser.FormatOrgDate(deadline))
-								updatedNotes = true
-								break
-							}
-						}
-						// If DEADLINE wasn't in notes, it will be added by writeItem
-						if !updatedNotes {
-							// Remove old deadline lines just to be safe
-							var filteredNotes []string
-							for _, note := range m.editingItem.Notes {
-								trimmedNote := strings.TrimSpace(note)
-								if !strings.HasPrefix(trimmedNote, "DEADLINE:") {
-									filteredNotes = append(filteredNotes, note)
-								}
-							}
-							m.editingItem.Notes = filteredNotes
-						}
-						m.setStatus("Deadline set!")
-					}
-				}
-			}
-			m.mode = modeList
-			m.textinput.Blur()
-			m.editingItem = nil
-			return m, nil
-		case tea.KeyEsc:
-			m.mode = modeList
-			m.textinput.Blur()
-			m.editingItem = nil
-			m.setStatus("Cancelled")
-			return m, nil
-		}
-	}
-
-	m.textinput, cmd = m.textinput.Update(msg)
-	return m, cmd
+	return m.updateSetDate(msg, "DEADLINE")
 }
 
-// parseDeadlineInput parses deadline input like "2024-01-15" or "+3" (3 days from now)
-func parseDeadlineInput(input string) (time.Time, error) {
+// parseDateInput parses date input like "2024-01-15" or "+3" (3 days from now)
+func parseDateInput(input string) (time.Time, error) {
 	// Check if it's a relative date (+N days)
 	if strings.HasPrefix(input, "+") {
 		daysStr := strings.TrimPrefix(input, "+")
@@ -623,6 +564,110 @@ func parseDeadlineInput(input string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("unable to parse date: %s (use YYYY-MM-DD or +N)", input)
+}
+
+func (m uiModel) updateSetScheduled(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return m.updateSetDate(msg, "SCHEDULED")
+}
+
+func (m uiModel) updateSetDate(msg tea.Msg, dateType string) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.textinput.Width = 50
+
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			input := strings.TrimSpace(m.textinput.Value())
+			if m.editingItem != nil {
+				var prefixDate string
+				var clearedDateMsg string
+				var setDateMsg string
+
+				if dateType == "DEADLINE" {
+					prefixDate = "DEADLINE:"
+					clearedDateMsg = "Deadline cleared!"
+					setDateMsg = "Deadline set!"
+				} else {
+					prefixDate = "SCHEDULED:"
+					clearedDateMsg = "Scheduled date cleared!"
+					setDateMsg = "Scheduled date set!"
+				}
+
+				if input == "" {
+					// Empty input clears the date
+					if dateType == "DEADLINE" {
+						m.editingItem.Deadline = nil
+					} else {
+						m.editingItem.Scheduled = nil
+					}
+
+					// Remove property line from notes
+					var filteredNotes []string
+					for _, note := range m.editingItem.Notes {
+						trimmedNote := strings.TrimSpace(note)
+						if !strings.HasPrefix(trimmedNote, prefixDate) {
+							filteredNotes = append(filteredNotes, note)
+						}
+					}
+					m.editingItem.Notes = filteredNotes
+					m.setStatus(clearedDateMsg)
+				} else {
+					dateVal, err := parseDateInput(input)
+					if err != nil {
+						m.setStatus(fmt.Sprintf("Invalid date: %v", err))
+					} else {
+						if dateType == "DEADLINE" {
+							m.editingItem.Deadline = &dateVal
+						} else {
+							m.editingItem.Scheduled = &dateVal
+						}
+
+						// Also update or add property line in notes
+						updatedNotes := false
+						for i, note := range m.editingItem.Notes {
+							trimmedNote := strings.TrimSpace(note)
+							if strings.HasPrefix(trimmedNote, prefixDate) {
+								m.editingItem.Notes[i] = fmt.Sprintf("%s <%s>", prefixDate, parser.FormatOrgDate(dateVal))
+								updatedNotes = true
+								break
+							}
+						}
+						// If property wasn't in notes, it will be added by writeItem
+						if !updatedNotes {
+							// Remove old property lines just to be safe
+							var filteredNotes []string
+							for _, note := range m.editingItem.Notes {
+								trimmedNote := strings.TrimSpace(note)
+								if !strings.HasPrefix(trimmedNote, prefixDate) {
+									filteredNotes = append(filteredNotes, note)
+								}
+							}
+							m.editingItem.Notes = filteredNotes
+						}
+						m.setStatus(setDateMsg)
+					}
+				}
+			}
+			m.mode = modeList
+			m.textinput.Blur()
+			m.editingItem = nil
+			return m, nil
+		case tea.KeyEsc:
+			m.mode = modeList
+			m.textinput.Blur()
+			m.editingItem = nil
+			m.setStatus("Cancelled")
+			return m, nil
+		}
+	}
+
+	m.textinput, cmd = m.textinput.Update(msg)
+	return m, cmd
 }
 
 func (m uiModel) updateSetPriority(msg tea.Msg) (tea.Model, tea.Cmd) {
