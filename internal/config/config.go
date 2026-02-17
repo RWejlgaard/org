@@ -31,6 +31,7 @@ type KeybindingsConfig struct {
 	Rename        []string `toml:"rename"`
 	CycleState    []string `toml:"cycle_state"`
 	ToggleFold    []string `toml:"toggle_fold"`
+	ToggleFoldAll []string `toml:"toggle_fold_all"`
 	EditNotes     []string `toml:"edit_notes"`
 	ToggleView    []string `toml:"toggle_view"`
 	Capture       []string `toml:"capture"`
@@ -115,6 +116,7 @@ func DefaultConfig() *Config {
 			Rename:        []string{"R"},
 			CycleState:    []string{"t", " "},
 			ToggleFold:    []string{"tab"},
+			ToggleFoldAll: []string{"shift+tab", "backtab"},
 			EditNotes:     []string{"enter"},
 			ToggleView:    []string{"a"},
 			Capture:       []string{"c"},
@@ -283,6 +285,9 @@ func (c *Config) fillDefaults() {
 	}
 	if len(c.Keybindings.ToggleFold) == 0 {
 		c.Keybindings.ToggleFold = defaults.Keybindings.ToggleFold
+	}
+	if len(c.Keybindings.ToggleFoldAll) == 0 {
+		c.Keybindings.ToggleFoldAll = defaults.Keybindings.ToggleFoldAll
 	}
 	if len(c.Keybindings.EditNotes) == 0 {
 		c.Keybindings.EditNotes = defaults.Keybindings.EditNotes
@@ -522,6 +527,8 @@ func (c *Config) UpdateKeybinding(action string, keys []string) error {
 		c.Keybindings.CycleState = keys
 	case "toggle_fold":
 		c.Keybindings.ToggleFold = keys
+	case "toggle_fold_all":
+		c.Keybindings.ToggleFoldAll = keys
 	case "edit_notes":
 		c.Keybindings.EditNotes = keys
 	case "capture":
@@ -551,34 +558,35 @@ func (c *Config) UpdateKeybinding(action string, keys []string) error {
 // GetAllKeybindings returns a map of all keybindings
 func (c *Config) GetAllKeybindings() map[string][]string {
 	return map[string][]string{
-		"up":             c.Keybindings.Up,
-		"down":           c.Keybindings.Down,
-		"left":           c.Keybindings.Left,
-		"right":          c.Keybindings.Right,
-		"shift_up":       c.Keybindings.ShiftUp,
-		"shift_down":     c.Keybindings.ShiftDown,
-		"shift_left":     c.Keybindings.ShiftLeft,
-		"shift_right":    c.Keybindings.ShiftRight,
-		"rename":         c.Keybindings.Rename,
-		"cycle_state":    c.Keybindings.CycleState,
-		"toggle_fold":    c.Keybindings.ToggleFold,
-		"edit_notes":     c.Keybindings.EditNotes,
-		"toggle_view":    c.Keybindings.ToggleView,
-		"capture":        c.Keybindings.Capture,
-		"add_subtask":    c.Keybindings.AddSubTask,
-		"delete":         c.Keybindings.Delete,
-		"save":           c.Keybindings.Save,
-		"toggle_reorder": c.Keybindings.ToggleReorder,
-		"clock_in":       c.Keybindings.ClockIn,
-		"clock_out":      c.Keybindings.ClockOut,
-		"set_deadline":   c.Keybindings.SetDeadline,
-		"set_scheduled":  c.Keybindings.SetScheduled,
-		"set_priority":   c.Keybindings.SetPriority,
-		"set_effort":     c.Keybindings.SetEffort,
-		"help":           c.Keybindings.Help,
-		"quit":           c.Keybindings.Quit,
-		"settings":       c.Keybindings.Settings,
-		"tag_item":       c.Keybindings.TagItem,
+		"up":              c.Keybindings.Up,
+		"down":            c.Keybindings.Down,
+		"left":            c.Keybindings.Left,
+		"right":           c.Keybindings.Right,
+		"shift_up":        c.Keybindings.ShiftUp,
+		"shift_down":      c.Keybindings.ShiftDown,
+		"shift_left":      c.Keybindings.ShiftLeft,
+		"shift_right":     c.Keybindings.ShiftRight,
+		"rename":          c.Keybindings.Rename,
+		"cycle_state":     c.Keybindings.CycleState,
+		"toggle_fold":     c.Keybindings.ToggleFold,
+		"toggle_fold_all": c.Keybindings.ToggleFoldAll,
+		"edit_notes":      c.Keybindings.EditNotes,
+		"toggle_view":     c.Keybindings.ToggleView,
+		"capture":         c.Keybindings.Capture,
+		"add_subtask":     c.Keybindings.AddSubTask,
+		"delete":          c.Keybindings.Delete,
+		"save":            c.Keybindings.Save,
+		"toggle_reorder":  c.Keybindings.ToggleReorder,
+		"clock_in":        c.Keybindings.ClockIn,
+		"clock_out":       c.Keybindings.ClockOut,
+		"set_deadline":    c.Keybindings.SetDeadline,
+		"set_scheduled":   c.Keybindings.SetScheduled,
+		"set_priority":    c.Keybindings.SetPriority,
+		"set_effort":      c.Keybindings.SetEffort,
+		"help":            c.Keybindings.Help,
+		"quit":            c.Keybindings.Quit,
+		"settings":        c.Keybindings.Settings,
+		"tag_item":        c.Keybindings.TagItem,
 	}
 }
 
