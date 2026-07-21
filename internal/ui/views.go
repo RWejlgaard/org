@@ -402,13 +402,19 @@ func (m uiModel) viewSetDate(title, helpMsg string) string {
 		content.WriteString(m.styles.statusStyle.Render(fmt.Sprintf("For: %s", m.editingItem.Title)))
 	}
 	content.WriteString("\n\n")
+	content.WriteString(m.datepicker.View())
+	content.WriteString("\n\n")
 	content.WriteString(m.textinput.View())
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.statusStyle.Render("Examples: 2025-12-31, +7 (7 days from now)"))
+	if m.dateTextFocused {
+		content.WriteString(m.styles.statusStyle.Render("Type YYYY-MM-DD or +N • Enter apply • Esc back to calendar"))
+	} else {
+		content.WriteString(m.styles.statusStyle.Render("↑↓←→/hjkl navigate • Tab month/year • Enter select • type a date or +N • x clear"))
+	}
 	content.WriteString("\n")
 	content.WriteString(m.styles.statusStyle.Render(helpMsg))
 	content.WriteString("\n")
-	content.WriteString(m.styles.statusStyle.Render("Press Enter to save • ESC to cancel"))
+	content.WriteString(m.styles.statusStyle.Render("Esc to cancel"))
 
 	dialog := dialogStyle.Render(content.String())
 

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	datepicker "github.com/ethanefung/bubble-datepicker"
 	"github.com/rwejlgaard/org/internal/model"
 	"github.com/rwejlgaard/org/internal/parser"
 )
@@ -317,10 +318,12 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.editingItem = items[m.cursor]
 				m.mode = modeSetDeadline
+				m.datepicker = newDatePicker(m.editingItem.Deadline)
+				m.dateTextFocused = false
 				m.textinput.SetValue("")
 				m.textinput.Placeholder = "YYYY-MM-DD or +N (days from today)"
-				m.textinput.Focus()
-				return m, textinput.Blink
+				m.textinput.Blur()
+				return m, nil
 			}
 
 		case key.Matches(msg, m.keys.SetScheduled):
@@ -328,10 +331,12 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.editingItem = items[m.cursor]
 				m.mode = modeSetScheduled
+				m.datepicker = newDatePicker(m.editingItem.Scheduled)
+				m.dateTextFocused = false
 				m.textinput.SetValue("")
 				m.textinput.Placeholder = "YYYY-MM-DD or +N (days from today)"
-				m.textinput.Focus()
-				return m, textinput.Blink
+				m.textinput.Blur()
+				return m, nil
 			}
 
 		case key.Matches(msg, m.keys.SetPriority):
@@ -573,6 +578,21 @@ func (m uiModel) updateAddSubTask(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// newDatePicker returns a calendar-focused datepicker seeded with existing (if
+// non-nil) or today. The Quit binding is cleared so 'q'/ctrl+c do not quit the
+// app while the calendar has focus.
+func newDatePicker(existing *time.Time) datepicker.Model {
+	t := time.Now()
+	if existing != nil {
+		t = *existing
+	}
+	dp := datepicker.New(t)
+	dp.SelectDate()
+	dp.SetFocus(datepicker.FocusCalendar)
+	dp.KeyMap.Quit = key.Binding{}
+	return dp
+}
+
 func (m uiModel) updateSetDeadline(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m.updateSetDate(msg, "DEADLINE")
 }
@@ -610,102 +630,150 @@ func (m uiModel) updateSetScheduled(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m.updateSetDate(msg, "SCHEDULED")
 }
 
-func (m uiModel) updateSetDate(msg tea.Msg, dateType string) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+// applyDate sets the deadline/scheduled date on the editing item and syncs its
+// property line in Notes.
+func (m *uiModel) applyDate(dateType string, dateVal time.Time) {
+	prefixDate := "SCHEDULED:"
+	setDateMsg := "Scheduled date set!"
+	if dateType == "DEADLINE" {
+		prefixDate = "DEADLINE:"
+		setDateMsg = "Deadline set!"
+		m.editingItem.Deadline = &dateVal
+	} else {
+		m.editingItem.Scheduled = &dateVal
+	}
 
+	updatedNotes := false
+	for i, note := range m.editingItem.Notes {
+		if strings.HasPrefix(strings.TrimSpace(note), prefixDate) {
+			m.editingItem.Notes[i] = fmt.Sprintf("%s <%s>", prefixDate, parser.FormatOrgDate(dateVal))
+			updatedNotes = true
+			break
+		}
+	}
+	if !updatedNotes {
+		var filtered []string
+		for _, note := range m.editingItem.Notes {
+			if !strings.HasPrefix(strings.TrimSpace(note), prefixDate) {
+				filtered = append(filtered, note)
+			}
+		}
+		m.editingItem.Notes = filtered
+	}
+	m.setStatus(setDateMsg)
+}
+
+// clearDate removes the deadline/scheduled date and its property line.
+func (m *uiModel) clearDate(dateType string) {
+	prefixDate := "SCHEDULED:"
+	clearedMsg := "Scheduled date cleared!"
+	if dateType == "DEADLINE" {
+		prefixDate = "DEADLINE:"
+		clearedMsg = "Deadline cleared!"
+		m.editingItem.Deadline = nil
+	} else {
+		m.editingItem.Scheduled = nil
+	}
+
+	var filtered []string
+	for _, note := range m.editingItem.Notes {
+		if !strings.HasPrefix(strings.TrimSpace(note), prefixDate) {
+			filtered = append(filtered, note)
+		}
+	}
+	m.editingItem.Notes = filtered
+	m.setStatus(clearedMsg)
+}
+
+func (m uiModel) updateSetDate(msg tea.Msg, dateType string) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.textinput.Width = 50
-
+		return m, nil
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
-			input := strings.TrimSpace(m.textinput.Value())
-			if m.editingItem != nil {
-				var prefixDate string
-				var clearedDateMsg string
-				var setDateMsg string
+		if m.dateTextFocused {
+			return m.updateSetDateText(msg, dateType)
+		}
+		return m.updateSetDateCalendar(msg, dateType)
+	}
+	// Forward other messages (e.g. cursor blink) to the text input when focused.
+	if m.dateTextFocused {
+		var cmd tea.Cmd
+		m.textinput, cmd = m.textinput.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
 
-				if dateType == "DEADLINE" {
-					prefixDate = "DEADLINE:"
-					clearedDateMsg = "Deadline cleared!"
-					setDateMsg = "Deadline set!"
-				} else {
-					prefixDate = "SCHEDULED:"
-					clearedDateMsg = "Scheduled date cleared!"
-					setDateMsg = "Scheduled date set!"
+// closeDateMode returns to the list view and clears set-date state.
+func (m uiModel) closeDateMode() (tea.Model, tea.Cmd) {
+	m.mode = modeList
+	m.textinput.Blur()
+	m.textinput.SetValue("")
+	m.dateTextFocused = false
+	m.editingItem = nil
+	return m, nil
+}
+
+func (m uiModel) updateSetDateCalendar(msg tea.KeyMsg, dateType string) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		if m.editingItem != nil {
+			m.applyDate(dateType, m.datepicker.Time)
+		}
+		return m.closeDateMode()
+	case tea.KeyEsc:
+		m.setStatus("Cancelled")
+		return m.closeDateMode()
+	case tea.KeyRunes:
+		if len(msg.Runes) == 1 {
+			r := msg.Runes[0]
+			if r == 'x' {
+				if m.editingItem != nil {
+					m.clearDate(dateType)
 				}
-
-				if input == "" {
-					// Empty input clears the date
-					if dateType == "DEADLINE" {
-						m.editingItem.Deadline = nil
-					} else {
-						m.editingItem.Scheduled = nil
-					}
-
-					// Remove property line from notes
-					var filteredNotes []string
-					for _, note := range m.editingItem.Notes {
-						trimmedNote := strings.TrimSpace(note)
-						if !strings.HasPrefix(trimmedNote, prefixDate) {
-							filteredNotes = append(filteredNotes, note)
-						}
-					}
-					m.editingItem.Notes = filteredNotes
-					m.setStatus(clearedDateMsg)
-				} else {
-					dateVal, err := parseDateInput(input)
-					if err != nil {
-						m.setStatus(fmt.Sprintf("Invalid date: %v", err))
-					} else {
-						if dateType == "DEADLINE" {
-							m.editingItem.Deadline = &dateVal
-						} else {
-							m.editingItem.Scheduled = &dateVal
-						}
-
-						// Also update or add property line in notes
-						updatedNotes := false
-						for i, note := range m.editingItem.Notes {
-							trimmedNote := strings.TrimSpace(note)
-							if strings.HasPrefix(trimmedNote, prefixDate) {
-								m.editingItem.Notes[i] = fmt.Sprintf("%s <%s>", prefixDate, parser.FormatOrgDate(dateVal))
-								updatedNotes = true
-								break
-							}
-						}
-						// If property wasn't in notes, it will be added by writeItem
-						if !updatedNotes {
-							// Remove old property lines just to be safe
-							var filteredNotes []string
-							for _, note := range m.editingItem.Notes {
-								trimmedNote := strings.TrimSpace(note)
-								if !strings.HasPrefix(trimmedNote, prefixDate) {
-									filteredNotes = append(filteredNotes, note)
-								}
-							}
-							m.editingItem.Notes = filteredNotes
-						}
-						m.setStatus(setDateMsg)
-					}
-				}
+				return m.closeDateMode()
 			}
-			m.mode = modeList
-			m.textinput.Blur()
-			m.editingItem = nil
-			return m, nil
-		case tea.KeyEsc:
-			m.mode = modeList
-			m.textinput.Blur()
-			m.editingItem = nil
-			m.setStatus("Cancelled")
-			return m, nil
+			if (r >= '0' && r <= '9') || r == '+' {
+				m.dateTextFocused = true
+				m.textinput.SetValue(string(r))
+				m.textinput.CursorEnd()
+				m.textinput.Focus()
+				return m, textinput.Blink
+			}
 		}
 	}
+	m.datepicker, _ = m.datepicker.Update(msg)
+	return m, nil
+}
 
+func (m uiModel) updateSetDateText(msg tea.KeyMsg, dateType string) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		input := strings.TrimSpace(m.textinput.Value())
+		if m.editingItem == nil {
+			return m.closeDateMode()
+		}
+		if input == "" {
+			m.clearDate(dateType)
+			return m.closeDateMode()
+		}
+		dateVal, err := parseDateInput(input)
+		if err != nil {
+			m.setStatus(fmt.Sprintf("Invalid date: %v", err))
+			return m, nil // stay in text focus so the user can fix it
+		}
+		m.applyDate(dateType, dateVal)
+		return m.closeDateMode()
+	case tea.KeyEsc:
+		m.dateTextFocused = false
+		m.textinput.Blur()
+		m.textinput.SetValue("")
+		return m, nil
+	}
+	var cmd tea.Cmd
 	m.textinput, cmd = m.textinput.Update(msg)
 	return m, cmd
 }
