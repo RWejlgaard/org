@@ -159,3 +159,25 @@ func TestCalendarEscCancels(t *testing.T) {
 		t.Fatalf("expected mode to return to list, got %v", rm.mode)
 	}
 }
+
+func TestOpeningDeadlineModeInitializesCalendar(t *testing.T) {
+	cfg := config.DefaultConfig()
+	item := &model.Item{Title: "Task", Level: 1}
+	of := &model.OrgFile{Items: []*model.Item{item}}
+	m := InitialModel(of, cfg, false, "")
+	// default deadline key is "d"
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	rm := res.(uiModel)
+	if rm.mode != modeSetDeadline {
+		t.Fatalf("expected modeSetDeadline, got %v", rm.mode)
+	}
+	if !rm.datepicker.Selected {
+		t.Fatal("expected datepicker to have a selected date")
+	}
+	if rm.dateTextFocused {
+		t.Fatal("expected calendar focus (dateTextFocused false)")
+	}
+	if rm.editingItem != item {
+		t.Fatal("expected editingItem to be the cursor item")
+	}
+}

@@ -318,10 +318,12 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.editingItem = items[m.cursor]
 				m.mode = modeSetDeadline
+				m.datepicker = newDatePicker(m.editingItem.Deadline)
+				m.dateTextFocused = false
 				m.textinput.SetValue("")
 				m.textinput.Placeholder = "YYYY-MM-DD or +N (days from today)"
-				m.textinput.Focus()
-				return m, textinput.Blink
+				m.textinput.Blur()
+				return m, nil
 			}
 
 		case key.Matches(msg, m.keys.SetScheduled):
@@ -329,10 +331,12 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.editingItem = items[m.cursor]
 				m.mode = modeSetScheduled
+				m.datepicker = newDatePicker(m.editingItem.Scheduled)
+				m.dateTextFocused = false
 				m.textinput.SetValue("")
 				m.textinput.Placeholder = "YYYY-MM-DD or +N (days from today)"
-				m.textinput.Focus()
-				return m, textinput.Blink
+				m.textinput.Blur()
+				return m, nil
 			}
 
 		case key.Matches(msg, m.keys.SetPriority):
