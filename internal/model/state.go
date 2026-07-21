@@ -4,9 +4,7 @@ package model
 type TodoState string
 
 const (
-	StateTODO  TodoState = "TODO"
-	StatePROG  TodoState = "PROG"
-	StateBLOCK TodoState = "BLOCK"
-	StateDONE  TodoState = "DONE"
-	StateNone  TodoState = ""
+	// StateNone is the empty (no TODO keyword) state. Concrete TODO states are
+	// user-configurable (see config.States), so they are not hardcoded here.
+	StateNone TodoState = ""
 )

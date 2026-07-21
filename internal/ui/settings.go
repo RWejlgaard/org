@@ -545,7 +545,7 @@ func (m *uiModel) viewSettings() string {
 	case settingsSectionTags:
 		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Edit • D: Delete\nc: Add new tag • ctrl+s: Save • q/,: Exit"
 	case settingsSectionStates:
-		instructions = "←/→: Switch tabs • ↑/↓: Navigate • shift+↑/↓: Reorder • Enter: Edit\nD: Delete • c: Add new state • ctrl+s: Save • q/,: Exit"
+		instructions = "←/→: Switch tabs • ↑/↓: Navigate • shift+↑/↓: Reorder • Enter: Edit\nD: Delete • c: Add new (or DONE) state • ctrl+s: Save • q/,: Exit"
 	case settingsSectionKeybindings:
 		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Edit keybinding\nctrl+s: Save • q/,: Exit"
 	}
