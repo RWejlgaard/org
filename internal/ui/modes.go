@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	datepicker "github.com/ethanefung/bubble-datepicker"
 	"github.com/rwejlgaard/org/internal/model"
 	"github.com/rwejlgaard/org/internal/parser"
 )
@@ -571,6 +572,21 @@ func (m uiModel) updateAddSubTask(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.textinput, cmd = m.textinput.Update(msg)
 	return m, cmd
+}
+
+// newDatePicker returns a calendar-focused datepicker seeded with existing (if
+// non-nil) or today. The Quit binding is cleared so 'q'/ctrl+c do not quit the
+// app while the calendar has focus.
+func newDatePicker(existing *time.Time) datepicker.Model {
+	t := time.Now()
+	if existing != nil {
+		t = *existing
+	}
+	dp := datepicker.New(t)
+	dp.SelectDate()
+	dp.SetFocus(datepicker.FocusCalendar)
+	dp.KeyMap.Quit = key.Binding{}
+	return dp
 }
 
 func (m uiModel) updateSetDeadline(msg tea.Msg) (tea.Model, tea.Cmd) {

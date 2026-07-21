@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	datepicker "github.com/ethanefung/bubble-datepicker"
 	"github.com/rwejlgaard/org/internal/config"
 	"github.com/rwejlgaard/org/internal/model"
 )
@@ -54,6 +55,8 @@ type uiModel struct {
 	settingsScroll  int             // Scroll position in settings view
 	settingsSection settingsSection // Current settings section/tab
 	captureCursor   int             // Store cursor position when entering capture mode
+	datepicker      datepicker.Model
+	dateTextFocused bool // within set-date modes: text field focused vs. calendar
 }
 
 func InitialModel(orgFile *model.OrgFile, cfg *config.Config, captureMode bool, captureText string) uiModel {
