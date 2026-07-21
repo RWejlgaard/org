@@ -498,6 +498,18 @@ func (c *Config) AddState(name, color string) {
 	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color})
 }
 
+// AddDoneState adds (or upgrades) a state and marks it as a done state.
+func (c *Config) AddDoneState(name, color string) {
+	for i := range c.States.States {
+		if c.States.States[i].Name == name {
+			c.States.States[i].Color = color
+			c.States.States[i].Done = true
+			return
+		}
+	}
+	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color, Done: true})
+}
+
 // RemoveState removes a state from the configuration
 func (c *Config) RemoveState(name string) {
 	for i, state := range c.States.States {

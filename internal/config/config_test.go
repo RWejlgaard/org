@@ -49,3 +49,25 @@ func TestFillDefaultsLeavesExplicitDoneFlagsAlone(t *testing.T) {
 		t.Error("last state (TODO) must NOT be auto-flagged when a done state already exists")
 	}
 }
+
+func TestAddDoneState(t *testing.T) {
+	c := &Config{}
+	c.AddDoneState("CANCELLED", "240")
+
+	if len(c.States.States) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(c.States.States))
+	}
+	s := c.States.States[0]
+	if s.Name != "CANCELLED" || s.Color != "240" || !s.Done {
+		t.Fatalf("unexpected state: %+v", s)
+	}
+
+	// Adding an existing name upgrades it to done.
+	c.AddState("REVIEW", "99")
+	c.AddDoneState("REVIEW", "99")
+	for _, st := range c.States.States {
+		if st.Name == "REVIEW" && !st.Done {
+			t.Fatal("expected REVIEW upgraded to done")
+		}
+	}
+}

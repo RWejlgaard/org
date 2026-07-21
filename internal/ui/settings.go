@@ -107,7 +107,12 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case settingsSectionTags:
 				m.addNewTag()
 			case settingsSectionStates:
-				m.addNewState()
+				// Rows: [0]=default state, [1..N]=states, [N+1]=add state, [N+2]=add DONE state.
+				if m.settingsCursor == len(m.config.States.States)+2 {
+					m.addNewDoneState()
+				} else {
+					m.addNewState()
+				}
 			case settingsSectionKeybindings:
 				// Cannot add keybindings yet
 			}
@@ -136,7 +141,7 @@ func (m *uiModel) getSettingsItemCount() int {
 	case settingsSectionTags:
 		return len(m.config.Tags.Tags) + 1 // +1 for "Add new tag" option
 	case settingsSectionStates:
-		return len(m.config.States.States) + 2 // +1 for "Default new task state" setting, +1 for "Add new state" option
+		return len(m.config.States.States) + 3 // default state + "Add new state" + "Add new DONE state"
 	case settingsSectionKeybindings:
 		return len(m.config.GetAllKeybindings())
 	default:
@@ -474,12 +479,23 @@ func (m *uiModel) addNewTag() {
 
 // addNewState adds a new state
 func (m *uiModel) addNewState() {
+	m.addingDoneState = false
 	m.textinput.SetValue("")
 	m.textinput.Placeholder = "Enter state name"
 	m.textinput.Focus()
 	m.textinput.Blur() // Will be refocused when user types
 
 	// Prompt for state name first, then color
+	m.mode = modeSettingsAddState
+}
+
+// addNewDoneState adds a new state that is marked as done.
+func (m *uiModel) addNewDoneState() {
+	m.addingDoneState = true
+	m.textinput.SetValue("")
+	m.textinput.Placeholder = "Enter DONE state name"
+	m.textinput.Focus()
+	m.textinput.Blur()
 	m.mode = modeSettingsAddState
 }
 
@@ -697,7 +713,7 @@ func (m *uiModel) viewSettingsStates() string {
 	}
 
 	endIdx := m.settingsScroll + availableHeight
-	totalItems := len(m.config.States.States) + 2 // +1 for default state, +1 for "Add new state"
+	totalItems := len(m.config.States.States) + 3 // +1 for default state, +1 for "Add new state", +1 for "Add new DONE state"
 
 	// First show the default new task state setting (item 0)
 	if 0 >= m.settingsScroll && 0 < endIdx {
@@ -741,6 +757,9 @@ func (m *uiModel) viewSettingsStates() string {
 		stateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(state.Color))
 		line += stateStyle.Render(state.Name)
 		line += fmt.Sprintf(" (color: %s)", state.Color)
+		if state.Done {
+			line += m.styles.statusStyle.Render(" ✓done")
+		}
 
 		content.WriteString(line + "\n")
 	}
@@ -754,6 +773,17 @@ func (m *uiModel) viewSettingsStates() string {
 			content.WriteString("  ")
 		}
 		content.WriteString(m.styles.statusStyle.Render("+ Add new state (press 'c')") + "\n")
+	}
+
+	// Add new DONE state option
+	addDoneIdx := len(m.config.States.States) + 2
+	if addDoneIdx >= m.settingsScroll && addDoneIdx < endIdx {
+		if m.settingsCursor == addDoneIdx && !m.textinput.Focused() {
+			content.WriteString("▶ ")
+		} else {
+			content.WriteString("  ")
+		}
+		content.WriteString(m.styles.statusStyle.Render("+ Add new DONE state (press 'c')") + "\n")
 	}
 
 	// Add scroll indicator if needed
@@ -916,7 +946,11 @@ func (m *uiModel) updateSettingsAddState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			stateName := m.textinput.Value()
 			if stateName != "" {
 				// Default color
-				m.config.AddState(stateName, "99")
+				if m.addingDoneState {
+					m.config.AddDoneState(stateName, "99")
+				} else {
+					m.config.AddState(stateName, "99")
+				}
 				// Auto-save
 				if err := m.config.Save(); err != nil {
 					m.setStatus(fmt.Sprintf("Error saving: %v", err))
@@ -924,6 +958,7 @@ func (m *uiModel) updateSettingsAddState(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.setStatus(fmt.Sprintf("Added state '%s' (saved)", stateName))
 				}
 			}
+			m.addingDoneState = false
 			m.textinput.Blur()
 			m.mode = modeSettings
 			return m, nil
