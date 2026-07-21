@@ -83,6 +83,7 @@ type TagsConfig struct {
 type StateConfig struct {
 	Name  string `toml:"name"`
 	Color string `toml:"color"`
+	Done  bool   `toml:"done,omitempty"`
 }
 
 // StatesConfig holds TODO state configurations
@@ -163,7 +164,7 @@ func DefaultConfig() *Config {
 				{Name: "TODO", Color: "202"},
 				{Name: "PROG", Color: "220"},
 				{Name: "BLOCK", Color: "196"},
-				{Name: "DONE", Color: "34"},
+				{Name: "DONE", Color: "34", Done: true},
 			},
 			DefaultNewTaskState: "TODO",
 		},
@@ -393,6 +394,21 @@ func (c *Config) fillDefaults() {
 	// Note: We don't fill DefaultNewTaskState if States.States is non-empty because
 	// an empty string is a valid intentional value meaning "no default state".
 
+	// Back-compat: if states exist but none is flagged done (config predates the
+	// `done` field), treat the last state as done to preserve prior behavior.
+	if len(c.States.States) > 0 {
+		anyDone := false
+		for _, s := range c.States.States {
+			if s.Done {
+				anyDone = true
+				break
+			}
+		}
+		if !anyDone {
+			c.States.States[len(c.States.States)-1].Done = true
+		}
+	}
+
 	// Fill UI if zero values
 	if c.UI.HelpTextWidth == 0 {
 		c.UI.HelpTextWidth = defaults.UI.HelpTextWidth
@@ -509,6 +525,19 @@ func (c *Config) GetStateNames() []string {
 		names[i] = state.Name
 	}
 	return names
+}
+
+// IsDoneState reports whether the named state is configured as a done state.
+func (c *Config) IsDoneState(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, state := range c.States.States {
+		if state.Name == name {
+			return state.Done
+		}
+	}
+	return false
 }
 
 // UpdateKeybinding updates a keybinding in the configuration
