@@ -41,6 +41,8 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSettingsAddTag(msg)
 	case modeSettingsAddState:
 		return m.updateSettingsAddState(msg)
+	case modeSettingsStateForm:
+		return m.updateSettingsStateForm(msg)
 	case modeTagEdit:
 		return m.updateTagEdit(msg)
 	case modeRename:

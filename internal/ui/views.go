@@ -92,6 +92,8 @@ func (m uiModel) View() string {
 		return m.viewSettingsAddTag()
 	case modeSettingsAddState:
 		return m.viewSettingsAddState()
+	case modeSettingsStateForm:
+		return m.viewSettingsStateForm()
 	case modeTagEdit:
 		return m.viewTagEdit()
 	case modeRename:

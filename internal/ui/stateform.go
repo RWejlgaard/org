@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // stateForm backs the add/edit state form (modeSettingsStateForm).
@@ -113,4 +115,104 @@ func (m *uiModel) applyStateForm() bool {
 	}
 	m.setStatus(fmt.Sprintf("Added state '%s' (saved)", name))
 	return true
+}
+
+// updateSettingsStateForm handles key input while the state form is open.
+func (m *uiModel) updateSettingsStateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+
+	switch keyMsg.Type {
+	case tea.KeyEsc:
+		m.mode = modeSettings
+		return m, nil
+
+	case tea.KeyEnter:
+		if m.applyStateForm() {
+			if err := m.config.Save(); err != nil {
+				m.setStatus(fmt.Sprintf("Error auto-saving config: %v", err))
+			} else {
+				m.keys = newKeyMapFromConfig(m.config)
+				m.styles = newStyleMapFromConfig(m.config)
+			}
+			m.mode = modeSettings
+		}
+		return m, nil
+
+	case tea.KeyTab, tea.KeyDown:
+		m.moveStateFormField(1)
+		return m, nil
+
+	case tea.KeyShiftTab, tea.KeyUp:
+		m.moveStateFormField(-1)
+		return m, nil
+
+	case tea.KeySpace:
+		if m.stateForm.field == 2 {
+			m.stateForm.done = !m.stateForm.done
+			return m, nil
+		}
+	}
+
+	// Route printable input to the focused text field.
+	var cmd tea.Cmd
+	switch m.stateForm.field {
+	case 0:
+		m.stateForm.name, cmd = m.stateForm.name.Update(msg)
+	case 1:
+		m.stateForm.color, cmd = m.stateForm.color.Update(msg)
+	}
+	return m, cmd
+}
+
+// viewSettingsStateForm renders the add/edit state form.
+func (m *uiModel) viewSettingsStateForm() string {
+	var b strings.Builder
+
+	title := "Add New State"
+	if m.stateForm.editing {
+		title = "Edit State: " + m.config.States.States[m.stateForm.index].Name
+	}
+	b.WriteString(m.styles.titleStyle.Render(title) + "\n\n")
+
+	cursor := func(field int) string {
+		if m.stateForm.field == field {
+			return "▶ "
+		}
+		return "  "
+	}
+
+	// Name row: editable input when adding, read-only label when editing.
+	if m.stateForm.editing {
+		b.WriteString("  Name   " + m.stateForm.name.Value() + m.styles.statusStyle.Render("  (fixed)") + "\n")
+	} else {
+		b.WriteString(cursor(0) + "Name   " + m.stateForm.name.View() + "\n")
+	}
+
+	// Color row with a live swatch.
+	colorVal := strings.TrimSpace(m.stateForm.color.Value())
+	swatch := ""
+	if colorVal != "" {
+		label := m.stateForm.name.Value()
+		if label == "" {
+			label = "sample"
+		}
+		sw := lipgloss.NewStyle().Foreground(lipgloss.Color(colorVal))
+		swatch = "  " + sw.Render("●"+label)
+	}
+	b.WriteString(cursor(1) + "Color  " + m.stateForm.color.View() + swatch + "\n")
+
+	// Done row: a checkbox.
+	box := "[ ] no"
+	if m.stateForm.done {
+		box = "[✓] yes"
+	}
+	b.WriteString(cursor(2) + "Done   " + box + "\n\n")
+
+	b.WriteString(m.styles.statusStyle.Render(
+		"tab/↑↓: move field • space: toggle done • enter: save • esc: cancel") + "\n")
+
+	return b.String()
 }
