@@ -486,28 +486,17 @@ func (c *Config) GetStateColor(stateName string) string {
 	return "99"
 }
 
-// AddState adds a new state to the configuration
-func (c *Config) AddState(name, color string) {
-	// Check if state already exists
-	for i, state := range c.States.States {
-		if state.Name == name {
-			c.States.States[i].Color = color
-			return
-		}
-	}
-	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color})
-}
-
-// AddDoneState adds (or upgrades) a state and marks it as a done state.
-func (c *Config) AddDoneState(name, color string) {
+// AddState adds (or upgrades) a state in the configuration, marking it as a
+// done state when done is true.
+func (c *Config) AddState(name, color string, done bool) {
 	for i := range c.States.States {
 		if c.States.States[i].Name == name {
 			c.States.States[i].Color = color
-			c.States.States[i].Done = true
+			c.States.States[i].Done = done
 			return
 		}
 	}
-	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color, Done: true})
+	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color, Done: done})
 }
 
 // RemoveState removes a state from the configuration

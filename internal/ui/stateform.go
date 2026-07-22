@@ -108,11 +108,7 @@ func (m *uiModel) applyStateForm() bool {
 	if color == "" {
 		color = "99"
 	}
-	if sf.done {
-		m.config.AddDoneState(name, color)
-	} else {
-		m.config.AddState(name, color)
-	}
+	m.config.AddState(name, color, sf.done)
 	m.setStatus(fmt.Sprintf("Added state '%s' (saved)", name))
 	return true
 }

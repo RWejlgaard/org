@@ -52,7 +52,7 @@ func TestFillDefaultsLeavesExplicitDoneFlagsAlone(t *testing.T) {
 
 func TestAddDoneState(t *testing.T) {
 	c := &Config{}
-	c.AddDoneState("CANCELLED", "240")
+	c.AddState("CANCELLED", "240", true)
 
 	if len(c.States.States) != 1 {
 		t.Fatalf("expected 1 state, got %d", len(c.States.States))
@@ -63,8 +63,8 @@ func TestAddDoneState(t *testing.T) {
 	}
 
 	// Adding an existing name upgrades it to done.
-	c.AddState("REVIEW", "99")
-	c.AddDoneState("REVIEW", "99")
+	c.AddState("REVIEW", "99", false)
+	c.AddState("REVIEW", "99", true)
 	for _, st := range c.States.States {
 		if st.Name == "REVIEW" && !st.Done {
 			t.Fatal("expected REVIEW upgraded to done")
