@@ -475,12 +475,22 @@ func (c *Config) UpdateTagColor(name, color string) {
 	}
 }
 
+// findState returns a pointer to the state with the given name, or nil if no
+// such state is configured. The pointer aliases the backing slice, so callers
+// may mutate the state in place.
+func (c *Config) findState(name string) *StateConfig {
+	for i := range c.States.States {
+		if c.States.States[i].Name == name {
+			return &c.States.States[i]
+		}
+	}
+	return nil
+}
+
 // GetStateColor returns the color for a given state name
 func (c *Config) GetStateColor(stateName string) string {
-	for _, state := range c.States.States {
-		if state.Name == stateName {
-			return state.Color
-		}
+	if state := c.findState(stateName); state != nil {
+		return state.Color
 	}
 	// Return a default color if state not found
 	return "99"
@@ -489,12 +499,10 @@ func (c *Config) GetStateColor(stateName string) string {
 // AddState adds (or upgrades) a state in the configuration, marking it as a
 // done state when done is true.
 func (c *Config) AddState(name, color string, done bool) {
-	for i := range c.States.States {
-		if c.States.States[i].Name == name {
-			c.States.States[i].Color = color
-			c.States.States[i].Done = done
-			return
-		}
+	if state := c.findState(name); state != nil {
+		state.Color = color
+		state.Done = done
+		return
 	}
 	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color, Done: done})
 }
@@ -511,11 +519,8 @@ func (c *Config) RemoveState(name string) {
 
 // UpdateStateColor updates the color of an existing state
 func (c *Config) UpdateStateColor(name, color string) {
-	for i, state := range c.States.States {
-		if state.Name == name {
-			c.States.States[i].Color = color
-			return
-		}
+	if state := c.findState(name); state != nil {
+		state.Color = color
 	}
 }
 
@@ -533,10 +538,8 @@ func (c *Config) IsDoneState(name string) bool {
 	if name == "" {
 		return false
 	}
-	for _, state := range c.States.States {
-		if state.Name == name {
-			return state.Done
-		}
+	if state := c.findState(name); state != nil {
+		return state.Done
 	}
 	return false
 }
