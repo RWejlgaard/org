@@ -56,7 +56,8 @@ type uiModel struct {
 	settingsSection settingsSection // Current settings section/tab
 	captureCursor   int             // Store cursor position when entering capture mode
 	datepicker      datepicker.Model
-	dateTextFocused bool // within set-date modes: text field focused vs. calendar
+	dateTextFocused bool      // within set-date modes: text field focused vs. calendar
+	stateForm       stateForm // backing state for the add/edit state form
 }
 
 func InitialModel(orgFile *model.OrgFile, cfg *config.Config, captureMode bool, captureText string) uiModel {

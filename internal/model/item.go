@@ -41,22 +41,6 @@ func (item *Item) ToggleFold() {
 	item.Folded = !item.Folded
 }
 
-// CycleState cycles through todo states
-func (item *Item) CycleState() {
-	switch item.State {
-	case StateNone:
-		item.State = StateTODO
-	case StateTODO:
-		item.State = StatePROG
-	case StatePROG:
-		item.State = StateBLOCK
-	case StateBLOCK:
-		item.State = StateDONE
-	case StateDONE:
-		item.State = StateNone
-	}
-}
-
 // ClockIn starts a new clock entry
 func (item *Item) ClockIn() bool {
 	// Check if already clocked in

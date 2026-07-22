@@ -39,8 +39,8 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSettings(msg)
 	case modeSettingsAddTag:
 		return m.updateSettingsAddTag(msg)
-	case modeSettingsAddState:
-		return m.updateSettingsAddState(msg)
+	case modeSettingsStateForm:
+		return m.updateSettingsStateForm(msg)
 	case modeTagEdit:
 		return m.updateTagEdit(msg)
 	case modeRename:
@@ -103,7 +103,7 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.cycleStateBackward(items[m.cursor])
 				// Auto clock out when changing to DONE
-				if items[m.cursor].State == model.StateDONE && items[m.cursor].IsClockedIn() {
+				if m.config.IsDoneState(string(items[m.cursor].State)) && items[m.cursor].IsClockedIn() {
 					items[m.cursor].ClockOut()
 				}
 				m.setStatus("State changed")
@@ -114,8 +114,7 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.cycleStateForward(items[m.cursor])
 				// Auto clock out when changing to last state (typically DONE)
-				stateNames := m.config.GetStateNames()
-				if len(stateNames) > 0 && string(items[m.cursor].State) == stateNames[len(stateNames)-1] && items[m.cursor].IsClockedIn() {
+				if m.config.IsDoneState(string(items[m.cursor].State)) && items[m.cursor].IsClockedIn() {
 					items[m.cursor].ClockOut()
 				}
 				m.setStatus("State changed")
@@ -138,8 +137,7 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(items) > 0 && m.cursor < len(items) {
 				m.cycleStateForward(items[m.cursor])
 				// Auto clock out when changing to last state (typically DONE)
-				stateNames := m.config.GetStateNames()
-				if len(stateNames) > 0 && string(items[m.cursor].State) == stateNames[len(stateNames)-1] && items[m.cursor].IsClockedIn() {
+				if m.config.IsDoneState(string(items[m.cursor].State)) && items[m.cursor].IsClockedIn() {
 					items[m.cursor].ClockOut()
 				}
 				m.setStatus("State changed")
@@ -870,6 +868,30 @@ func (m uiModel) updateSetEffort(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// stripClosedNotes removes any note line that is a CLOSED: planning entry.
+func stripClosedNotes(notes []string) []string {
+	var filtered []string
+	for _, note := range notes {
+		if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
+			filtered = append(filtered, note)
+		}
+	}
+	return filtered
+}
+
+// applyClosedTransition stamps or clears the CLOSED timestamp based on whether
+// the item entered or left the set of done states.
+func applyClosedTransition(item *model.Item, wasDone, isDone bool, now time.Time) {
+	switch {
+	case isDone && !wasDone:
+		item.Closed = &now
+		item.Notes = stripClosedNotes(item.Notes)
+	case wasDone && !isDone:
+		item.Closed = nil
+		item.Notes = stripClosedNotes(item.Notes)
+	}
+}
+
 func (m *uiModel) cycleStateForward(item *model.Item) {
 	stateNames := m.config.GetStateNames()
 	if len(stateNames) == 0 {
@@ -879,7 +901,6 @@ func (m *uiModel) cycleStateForward(item *model.Item) {
 	// Find current state index
 	currentIndex := -1
 	currentState := string(item.State)
-	lastStateIndex := len(stateNames) - 1
 
 	// Handle empty state
 	if currentState == "" {
@@ -911,34 +932,8 @@ func (m *uiModel) cycleStateForward(item *model.Item) {
 	// Update the item state
 	item.State = model.TodoState(newState)
 
-	// Manage CLOSED timestamp
-	wasInDoneState := (oldState == stateNames[lastStateIndex])
-	isInDoneState := (newState == stateNames[lastStateIndex])
-
-	if isInDoneState && !wasInDoneState {
-		// Moving TO done state - add CLOSED timestamp
-		now := time.Now()
-		item.Closed = &now
-		// Remove any existing CLOSED line from notes
-		var filteredNotes []string
-		for _, note := range item.Notes {
-			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
-				filteredNotes = append(filteredNotes, note)
-			}
-		}
-		item.Notes = filteredNotes
-	} else if wasInDoneState && !isInDoneState {
-		// Moving FROM done state - remove CLOSED timestamp
-		item.Closed = nil
-		// Remove any existing CLOSED line from notes
-		var filteredNotes []string
-		for _, note := range item.Notes {
-			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
-				filteredNotes = append(filteredNotes, note)
-			}
-		}
-		item.Notes = filteredNotes
-	}
+	// Manage CLOSED timestamp based on the configured done-state set.
+	applyClosedTransition(item, m.config.IsDoneState(oldState), m.config.IsDoneState(newState), time.Now())
 }
 
 func (m *uiModel) cycleStateBackward(item *model.Item) {
@@ -950,7 +945,6 @@ func (m *uiModel) cycleStateBackward(item *model.Item) {
 	// Find current state index
 	currentIndex := -1
 	currentState := string(item.State)
-	lastStateIndex := len(stateNames) - 1
 
 	// Handle empty state
 	if currentState == "" {
@@ -980,34 +974,8 @@ func (m *uiModel) cycleStateBackward(item *model.Item) {
 	// Update the item state
 	item.State = model.TodoState(newState)
 
-	// Manage CLOSED timestamp
-	wasInDoneState := (oldState == stateNames[lastStateIndex])
-	isInDoneState := (newState == stateNames[lastStateIndex])
-
-	if isInDoneState && !wasInDoneState {
-		// Moving TO done state - add CLOSED timestamp
-		now := time.Now()
-		item.Closed = &now
-		// Remove any existing CLOSED line from notes
-		var filteredNotes []string
-		for _, note := range item.Notes {
-			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
-				filteredNotes = append(filteredNotes, note)
-			}
-		}
-		item.Notes = filteredNotes
-	} else if wasInDoneState && !isInDoneState {
-		// Moving FROM done state - remove CLOSED timestamp
-		item.Closed = nil
-		// Remove any existing CLOSED line from notes
-		var filteredNotes []string
-		for _, note := range item.Notes {
-			if !strings.HasPrefix(strings.TrimSpace(note), "CLOSED:") {
-				filteredNotes = append(filteredNotes, note)
-			}
-		}
-		item.Notes = filteredNotes
-	}
+	// Manage CLOSED timestamp based on the configured done-state set.
+	applyClosedTransition(item, m.config.IsDoneState(oldState), m.config.IsDoneState(newState), time.Now())
 }
 
 func (m *uiModel) deleteItem(item *model.Item) {

@@ -83,6 +83,7 @@ type TagsConfig struct {
 type StateConfig struct {
 	Name  string `toml:"name"`
 	Color string `toml:"color"`
+	Done  bool   `toml:"done,omitempty"`
 }
 
 // StatesConfig holds TODO state configurations
@@ -163,7 +164,7 @@ func DefaultConfig() *Config {
 				{Name: "TODO", Color: "202"},
 				{Name: "PROG", Color: "220"},
 				{Name: "BLOCK", Color: "196"},
-				{Name: "DONE", Color: "34"},
+				{Name: "DONE", Color: "34", Done: true},
 			},
 			DefaultNewTaskState: "TODO",
 		},
@@ -393,6 +394,21 @@ func (c *Config) fillDefaults() {
 	// Note: We don't fill DefaultNewTaskState if States.States is non-empty because
 	// an empty string is a valid intentional value meaning "no default state".
 
+	// Back-compat: if states exist but none is flagged done (config predates the
+	// `done` field), treat the last state as done to preserve prior behavior.
+	if len(c.States.States) > 0 {
+		anyDone := false
+		for _, s := range c.States.States {
+			if s.Done {
+				anyDone = true
+				break
+			}
+		}
+		if !anyDone {
+			c.States.States[len(c.States.States)-1].Done = true
+		}
+	}
+
 	// Fill UI if zero values
 	if c.UI.HelpTextWidth == 0 {
 		c.UI.HelpTextWidth = defaults.UI.HelpTextWidth
@@ -459,27 +475,36 @@ func (c *Config) UpdateTagColor(name, color string) {
 	}
 }
 
+// findState returns a pointer to the state with the given name, or nil if no
+// such state is configured. The pointer aliases the backing slice, so callers
+// may mutate the state in place.
+func (c *Config) findState(name string) *StateConfig {
+	for i := range c.States.States {
+		if c.States.States[i].Name == name {
+			return &c.States.States[i]
+		}
+	}
+	return nil
+}
+
 // GetStateColor returns the color for a given state name
 func (c *Config) GetStateColor(stateName string) string {
-	for _, state := range c.States.States {
-		if state.Name == stateName {
-			return state.Color
-		}
+	if state := c.findState(stateName); state != nil {
+		return state.Color
 	}
 	// Return a default color if state not found
 	return "99"
 }
 
-// AddState adds a new state to the configuration
-func (c *Config) AddState(name, color string) {
-	// Check if state already exists
-	for i, state := range c.States.States {
-		if state.Name == name {
-			c.States.States[i].Color = color
-			return
-		}
+// AddState adds (or upgrades) a state in the configuration, marking it as a
+// done state when done is true.
+func (c *Config) AddState(name, color string, done bool) {
+	if state := c.findState(name); state != nil {
+		state.Color = color
+		state.Done = done
+		return
 	}
-	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color})
+	c.States.States = append(c.States.States, StateConfig{Name: name, Color: color, Done: done})
 }
 
 // RemoveState removes a state from the configuration
@@ -494,11 +519,8 @@ func (c *Config) RemoveState(name string) {
 
 // UpdateStateColor updates the color of an existing state
 func (c *Config) UpdateStateColor(name, color string) {
-	for i, state := range c.States.States {
-		if state.Name == name {
-			c.States.States[i].Color = color
-			return
-		}
+	if state := c.findState(name); state != nil {
+		state.Color = color
 	}
 }
 
@@ -509,6 +531,17 @@ func (c *Config) GetStateNames() []string {
 		names[i] = state.Name
 	}
 	return names
+}
+
+// IsDoneState reports whether the named state is configured as a done state.
+func (c *Config) IsDoneState(name string) bool {
+	if name == "" {
+		return false
+	}
+	if state := c.findState(name); state != nil {
+		return state.Done
+	}
+	return false
 }
 
 // UpdateKeybinding updates a keybinding in the configuration
