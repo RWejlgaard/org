@@ -874,6 +874,9 @@ func (m *uiModel) viewSettingsKeybindings() string {
 // modeSettingsAddTag is a special mode for adding tags
 const modeSettingsAddTag viewMode = 100
 
+// modeSettingsStateForm is the add/edit state form mode.
+const modeSettingsStateForm viewMode = 102
+
 // modeSettingsAddState is a special mode for adding states
 const modeSettingsAddState viewMode = 101
 
