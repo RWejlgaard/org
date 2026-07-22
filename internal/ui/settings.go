@@ -107,12 +107,8 @@ func (m *uiModel) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case settingsSectionTags:
 				m.addNewTag()
 			case settingsSectionStates:
-				// Rows: [0]=default state, [1..N]=states, [N+1]=add state, [N+2]=add DONE state.
-				if m.settingsCursor == len(m.config.States.States)+2 {
-					m.addNewDoneState()
-				} else {
-					m.addNewState()
-				}
+				// Rows: [0]=default state, [1..N]=states, [N+1]=add state.
+				m.startStateForm(false, 0)
 			case settingsSectionKeybindings:
 				// Cannot add keybindings yet
 			}
@@ -141,7 +137,7 @@ func (m *uiModel) getSettingsItemCount() int {
 	case settingsSectionTags:
 		return len(m.config.Tags.Tags) + 1 // +1 for "Add new tag" option
 	case settingsSectionStates:
-		return len(m.config.States.States) + 3 // default state + "Add new state" + "Add new DONE state"
+		return len(m.config.States.States) + 2 // default state + "Add new state"
 	case settingsSectionKeybindings:
 		return len(m.config.GetAllKeybindings())
 	default:
@@ -237,12 +233,11 @@ func (m *uiModel) startSettingsEdit() {
 		// Adjust for the default state setting offset
 		stateIndex := m.settingsCursor - 1
 		if stateIndex >= len(m.config.States.States) {
+			// On the "Add new state" row: open the form in add mode.
+			m.startStateForm(false, 0)
 			return
 		}
-		state := m.config.States.States[stateIndex]
-		m.textinput.SetValue(state.Name + "," + state.Color)
-		m.textinput.Placeholder = "name,color (e.g., TODO,202)"
-		m.textinput.Focus()
+		m.startStateForm(true, stateIndex)
 
 	case settingsSectionKeybindings:
 		// Edit keybinding
@@ -330,23 +325,6 @@ func (m *uiModel) saveSettingsEdit() {
 			if err := m.config.Save(); err != nil {
 				m.setStatus(fmt.Sprintf("Error auto-saving config: %v", err))
 			}
-			return
-		}
-
-		// Adjust for the default state setting offset
-		stateIndex := m.settingsCursor - 1
-		if stateIndex >= len(m.config.States.States) {
-			return
-		}
-		// Parse "name,color" format
-		parts := strings.Split(m.textinput.Value(), ",")
-		if len(parts) >= 2 {
-			state := &m.config.States.States[stateIndex]
-			state.Name = strings.TrimSpace(parts[0])
-			state.Color = strings.TrimSpace(parts[1])
-			m.setStatus(fmt.Sprintf("Updated state '%s' (saved)", state.Name))
-		} else {
-			m.setStatus("Invalid format. Use: name,color")
 			return
 		}
 
@@ -477,28 +455,6 @@ func (m *uiModel) addNewTag() {
 	m.mode = modeSettingsAddTag
 }
 
-// addNewState adds a new state
-func (m *uiModel) addNewState() {
-	m.addingDoneState = false
-	m.textinput.SetValue("")
-	m.textinput.Placeholder = "Enter state name"
-	m.textinput.Focus()
-	m.textinput.Blur() // Will be refocused when user types
-
-	// Prompt for state name first, then color
-	m.mode = modeSettingsAddState
-}
-
-// addNewDoneState adds a new state that is marked as done.
-func (m *uiModel) addNewDoneState() {
-	m.addingDoneState = true
-	m.textinput.SetValue("")
-	m.textinput.Placeholder = "Enter DONE state name"
-	m.textinput.Focus()
-	m.textinput.Blur()
-	m.mode = modeSettingsAddState
-}
-
 // viewSettings renders the settings view
 func (m *uiModel) viewSettings() string {
 	var content strings.Builder
@@ -545,7 +501,7 @@ func (m *uiModel) viewSettings() string {
 	case settingsSectionTags:
 		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Edit • D: Delete\nc: Add new tag • ctrl+s: Save • q/,: Exit"
 	case settingsSectionStates:
-		instructions = "←/→: Switch tabs • ↑/↓: Navigate • shift+↑/↓: Reorder • Enter: Edit\nD: Delete • c: Add new (or DONE) state • ctrl+s: Save • q/,: Exit"
+		instructions = "←/→: Switch tabs • ↑/↓: Navigate • shift+↑/↓: Reorder • Enter: Edit\nD: Delete • c: Add new state • ctrl+s: Save • q/,: Exit"
 	case settingsSectionKeybindings:
 		instructions = "←/→: Switch tabs • ↑/↓: Navigate • Enter: Edit keybinding\nctrl+s: Save • q/,: Exit"
 	}
@@ -713,7 +669,7 @@ func (m *uiModel) viewSettingsStates() string {
 	}
 
 	endIdx := m.settingsScroll + availableHeight
-	totalItems := len(m.config.States.States) + 3 // +1 for default state, +1 for "Add new state", +1 for "Add new DONE state"
+	totalItems := len(m.config.States.States) + 2 // +1 for default state, +1 for "Add new state"
 
 	// First show the default new task state setting (item 0)
 	if 0 >= m.settingsScroll && 0 < endIdx {
@@ -773,17 +729,6 @@ func (m *uiModel) viewSettingsStates() string {
 			content.WriteString("  ")
 		}
 		content.WriteString(m.styles.statusStyle.Render("+ Add new state (press 'c')") + "\n")
-	}
-
-	// Add new DONE state option
-	addDoneIdx := len(m.config.States.States) + 2
-	if addDoneIdx >= m.settingsScroll && addDoneIdx < endIdx {
-		if m.settingsCursor == addDoneIdx && !m.textinput.Focused() {
-			content.WriteString("▶ ")
-		} else {
-			content.WriteString("  ")
-		}
-		content.WriteString(m.styles.statusStyle.Render("+ Add new DONE state (press 'c')") + "\n")
 	}
 
 	// Add scroll indicator if needed
@@ -877,9 +822,6 @@ const modeSettingsAddTag viewMode = 100
 // modeSettingsStateForm is the add/edit state form mode.
 const modeSettingsStateForm viewMode = 102
 
-// modeSettingsAddState is a special mode for adding states
-const modeSettingsAddState viewMode = 101
-
 // updateSettingsAddTag handles the add tag flow
 func (m *uiModel) updateSettingsAddTag(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -927,62 +869,6 @@ func (m *uiModel) viewSettingsAddTag() string {
 	content.WriteString(m.styles.titleStyle.Render("Add New Tag") + "\n\n")
 	content.WriteString(m.textinput.View() + "\n\n")
 	content.WriteString(m.styles.statusStyle.Render("Enter tag name • Press Enter to add • ESC to cancel") + "\n")
-
-	return content.String()
-}
-
-// updateSettingsAddState handles the add state flow
-func (m *uiModel) updateSettingsAddState(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if !m.textinput.Focused() {
-			m.textinput.Focus()
-		}
-
-		switch {
-		case msg.Type == tea.KeyEsc:
-			m.textinput.Blur()
-			m.mode = modeSettings
-			return m, nil
-
-		case msg.Type == tea.KeyEnter:
-			stateName := m.textinput.Value()
-			if stateName != "" {
-				// Default color
-				if m.addingDoneState {
-					m.config.AddDoneState(stateName, "99")
-				} else {
-					m.config.AddState(stateName, "99")
-				}
-				// Auto-save
-				if err := m.config.Save(); err != nil {
-					m.setStatus(fmt.Sprintf("Error saving: %v", err))
-				} else {
-					m.setStatus(fmt.Sprintf("Added state '%s' (saved)", stateName))
-				}
-			}
-			m.addingDoneState = false
-			m.textinput.Blur()
-			m.mode = modeSettings
-			return m, nil
-
-		default:
-			var cmd tea.Cmd
-			m.textinput, cmd = m.textinput.Update(msg)
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-// viewSettingsAddState renders the add state view
-func (m *uiModel) viewSettingsAddState() string {
-	var content strings.Builder
-
-	content.WriteString(m.styles.titleStyle.Render("Add New State") + "\n\n")
-	content.WriteString(m.textinput.View() + "\n\n")
-	content.WriteString(m.styles.statusStyle.Render("Enter state name • Press Enter to add • ESC to cancel") + "\n")
 
 	return content.String()
 }
